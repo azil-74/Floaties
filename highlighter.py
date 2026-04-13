@@ -1,12 +1,12 @@
 # Save Notes: Markdown & URL Syntax Highlighter
 # Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: O(1) text styling decoupled from the main UI thread.
+# Status: Phase 3 Stable (Python Native Regex to prevent C++ Iterator lockups)
 
 from PyQt6.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor
-from PyQt6.QtCore import QRegularExpression
+import re
 
 class MarkdownHighlighter(QSyntaxHighlighter):
-    """Scans visible text blocks and applies non-destructive formatting."""
+    """Scans visible text blocks and applies non-destructive formatting for URLs."""
     def __init__(self, document, base_text_hex: str):
         super().__init__(document)
         self._setup_formats()
@@ -16,18 +16,15 @@ class MarkdownHighlighter(QSyntaxHighlighter):
         self.url_format = QTextCharFormat()
         self.url_format.setForeground(QColor("#569CD6")) # VS Code Blue
         self.url_format.setFontUnderline(True)
-        
-        # C++ Native Regex for zero-latency UI thread execution
-        self.url_pattern = QRegularExpression(r"(https?://\S+)")
 
     def update_theme(self, base_text_hex: str) -> None:
-        """Allows dynamic theme swapping without destroying text state."""
-        # URLs stay blue regardless of theme, but we prep this for Phase 4 text updates
+        """Allows dynamic theme swapping."""
         self.rehighlight()
 
     def highlightBlock(self, text: str) -> None:
-        # 1. Highlight URLs
-        iterator = self.url_pattern.globalMatch(text)
-        while iterator.hasNext():
-            match = iterator.next()
-            self.setFormat(match.capturedStart(), match.capturedLength(), self.url_format)
+        # Highlight URLs safely using Python's native C-backend Regex
+        # This completely bypasses the QRegularExpression C++ memory locks
+        for match in re.finditer(r"https?://\S+", text):
+            # Calculate length dynamically to feed into Qt's format engine
+            length = match.end() - match.start()
+            self.setFormat(match.start(), length, self.url_format)

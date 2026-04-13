@@ -1,37 +1,37 @@
 # Save Notes: Static Footer Toolbar with WCAG Auto-Contrast
 # Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Stripped out hover animations for maximum stability and permanent visibility.
+# Action: Integrated the Guide/Menu button from the header.
 
 from PyQt6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QMenu, QGridLayout, QApplication
+    QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QMenu, QGridLayout
 )
-from PyQt6.QtGui import QTextCharFormat, QFont, QColor, QPainter, QBrush
+from PyQt6.QtGui import QTextCharFormat, QFont, QColor, QPainter, QBrush, QTextListFormat
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 
-# Curated Modern Palette (Background Hex, Border Hex)
+# Import the standalone guide window
+from guide import InfoDialog
+
 PRESET_THEMES = [
-    {"bg": "#FFF2AB", "border": "#D4C37A"}, # Classic Yellow
-    {"bg": "#FFD9E8", "border": "#D4A8BD"}, # Soft Pink
-    {"bg": "#E2F0CB", "border": "#B5CFA3"}, # Mint Green
-    {"bg": "#D4F0F0", "border": "#A8C4C4"}, # Sky Blue
-    {"bg": "#E6E6FA", "border": "#BDBDF0"}, # Lavender
-    {"bg": "#FFE5B4", "border": "#D4B887"}, # Peach
-    {"bg": "#2D2D30", "border": "#1E1E1E"}, # Dark Slate
-    {"bg": "#1E293B", "border": "#0F172A"}, # Midnight Navy
-    {"bg": "#3E2723", "border": "#261714"}, # Deep Espresso
-    {"bg": "#36454F", "border": "#1C2833"}, # Charcoal
-    {"bg": "#2C5F2D", "border": "#1A3C1B"}, # Forest Green
-    {"bg": "#722F37", "border": "#4A1E24"}, # Deep Wine
+    {"bg": "#FFF2AB", "border": "#D4C37A"}, 
+    {"bg": "#FFD9E8", "border": "#D4A8BD"}, 
+    {"bg": "#E2F0CB", "border": "#B5CFA3"}, 
+    {"bg": "#D4F0F0", "border": "#A8C4C4"}, 
+    {"bg": "#E6E6FA", "border": "#BDBDF0"}, 
+    {"bg": "#FFE5B4", "border": "#D4B887"}, 
+    {"bg": "#2D2D30", "border": "#1E1E1E"}, 
+    {"bg": "#1E293B", "border": "#0F172A"}, 
+    {"bg": "#3E2723", "border": "#261714"}, 
+    {"bg": "#36454F", "border": "#1C2833"}, 
+    {"bg": "#2C5F2D", "border": "#1A3C1B"}, 
+    {"bg": "#722F37", "border": "#4A1E24"}, 
 ]
 
 def get_wcag_text_color(hex_bg: str) -> str:
-    """Calculates relative luminance to determine optimal text contrast (O(1))."""
     color = QColor(hex_bg)
     luminance = (0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()) / 255
     return "#000000" if luminance > 0.5 else "#FFFFFF"
 
 class ColorSwatchButton(QPushButton):
-    """Custom painted circular button for the theme preset menu."""
     def __init__(self, bg_hex: str, border_hex: str) -> None:
         super().__init__()
         self.bg_hex = bg_hex
@@ -53,8 +53,6 @@ class FormattingToolbar(QFrame):
     def __init__(self, editor_reference) -> None:
         super().__init__()
         self.editor = editor_reference
-        
-        # UI Polish: Locked to a permanent, stable height. No animations.
         self.setFixedHeight(32) 
         self.setObjectName("FooterToolbar")
         
@@ -92,6 +90,15 @@ class FormattingToolbar(QFrame):
         btn_strike = QPushButton("S")
         btn_strike.clicked.connect(self._toggle_strike)
 
+        btn_list = QPushButton("L")
+        btn_list.clicked.connect(self._toggle_list)
+
+        # Meta Actions (Right Side)
+        self.btn_guide = QPushButton("≡")
+        self.btn_guide.setStyleSheet("font-size: 16px; font-weight: normal; font-family: 'Segoe UI', sans-serif;")
+        self.btn_guide.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_guide.clicked.connect(self._show_info_dialog)
+
         self.btn_color = QPushButton("◑")
         self.btn_color.setFont(QFont("Segoe UI", 12))
         self.btn_color.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -102,15 +109,17 @@ class FormattingToolbar(QFrame):
         self.btn_layout.addWidget(btn_italic)
         self.btn_layout.addWidget(btn_under)
         self.btn_layout.addWidget(btn_strike)
+        self.btn_layout.addWidget(btn_list)
+        
         self.btn_layout.addStretch() 
+        
+        self.btn_layout.addWidget(self.btn_guide)
         self.btn_layout.addWidget(self.btn_color)
 
     def _build_color_menu(self) -> None:
         self.color_menu = QMenu(self)
         self.color_menu.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
-        self.color_menu.setStyleSheet("""
-            QMenu { background-color: #FAFAFA; border: 1px solid #DCDCDC; border-radius: 6px; padding: 4px; }
-        """)
+        self.color_menu.setStyleSheet("QMenu { background-color: #FAFAFA; border: 1px solid #DCDCDC; border-radius: 6px; padding: 4px; }")
         
         grid_widget = QWidget()
         grid_layout = QGridLayout(grid_widget)
@@ -139,6 +148,13 @@ class FormattingToolbar(QFrame):
         text_color = get_wcag_text_color(theme["bg"])
         self.theme_color_changed.emit(theme["bg"], theme["border"], text_color)
 
+    def _show_info_dialog(self) -> None:
+        if hasattr(self, 'info_window') and self.info_window.isVisible():
+            self.info_window.raise_()
+            return
+        self.info_window = InfoDialog()
+        self.info_window.show()
+
     # --- Robust Text Formatting Logic ---
     def _toggle_bold(self) -> None:
         fmt = self.editor.currentCharFormat()
@@ -160,3 +176,19 @@ class FormattingToolbar(QFrame):
         fmt = self.editor.currentCharFormat()
         fmt.setFontStrikeOut(not fmt.fontStrikeOut())
         self.editor.mergeCurrentCharFormat(fmt)
+
+    def _toggle_list(self) -> None:
+        cursor = self.editor.textCursor()
+        cursor.beginEditBlock()
+        if cursor.currentList():
+            block_format = cursor.blockFormat()
+            block_format.setObjectIndex(-1)
+            block_format.setIndent(0)
+            cursor.setBlockFormat(block_format)
+        else:
+            list_format = QTextListFormat()
+            list_format.setStyle(QTextListFormat.Style.ListDisc)
+            cursor.createList(list_format)
+        cursor.endEditBlock()
+        self.editor.setTextCursor(cursor)
+        self.editor.setFocus()
