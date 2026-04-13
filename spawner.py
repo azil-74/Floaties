@@ -19,6 +19,18 @@ class SpawnButton(QPushButton):
         self.parent_window = parent_window
         self.clicked.connect(self.spawn_duplicate)
         self.icon_color = QColor("#000000")
+        # Hover state tracker needed for manual paintEvent rendering (no super() call)
+        self._hovered = False
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
 
     def spawn_duplicate(self) -> None:
         """Instantiates a new window with the next round-robin theme."""
@@ -42,9 +54,17 @@ class SpawnButton(QPushButton):
         """)
         
     def paintEvent(self, event):
-        super().paintEvent(event)
+        # FIX: Do NOT call super().paintEvent() here.
+        # Qt's internal painter from super() + our QPainter = two painters on one device.
+        # This is tolerated on Windows but crashes on Linux/Ubuntu. We own the full paint cycle.
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Manually replicate the CSS :hover background (since we skip super, stylesheet won't render)
+        if self._hovered:
+            painter.setBrush(QColor(0, 0, 0, 20))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 4, 4)
         
         pen = QPen(self.icon_color)
         pen.setWidthF(1.5)

@@ -31,7 +31,7 @@ class ModernSizeGrip(QSizeGrip):
 class StickyNote(QMainWindow):
     """Core Sticky Note Window adhering to Single Responsibility Principle."""
     # theme_index defaults to 0 (Classic Yellow) for the very first app launch
-    def __init__(self, theme_index: int = 0) -> None:
+    def __init__(self, theme_index: int = 6) -> None:
         super().__init__()
         self.is_rolled_up = False
         self._normal_height = 150 # Memory variable for un-rolling

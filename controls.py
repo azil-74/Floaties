@@ -42,10 +42,18 @@ class ModernButton(QPushButton):
             super().mouseReleaseEvent(event)
 
     def paintEvent(self, event):
-        super().paintEvent(event) 
-        
+        # FIX: Do NOT call super().paintEvent() here.
+        # Qt's internal painter from super() + our QPainter = two painters on one device.
+        # This is tolerated on Windows but crashes on Linux/Ubuntu. We own the full paint cycle.
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Manually replicate the CSS :hover background (since we skip super, stylesheet won't render)
+        # Close button keeps the subtle bg even on hover — red is shown via icon color change below
+        if self._hovered:
+            painter.setBrush(QColor(0, 0, 0, 20))
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 4, 4)
         
         # UI Polish: Changes the stroke itself to red, rather than drawing a bulky background box
         current_color = QColor("#E81123") if (self._hovered and self.is_close) else self.icon_color
