@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTextEdit, QGridLayout, QWidget, QSizeGrip, QFrame
+from PyQt6.QtWidgets import QApplication, QMainWindow, QGridLayout, QWidget, QSizeGrip, QFrame
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 
@@ -7,6 +7,7 @@ from PyQt6.QtGui import QColor, QPainter, QPen
 from toolbar import FormattingToolbar, PRESET_THEMES, get_wcag_text_color
 from header import DragHeader
 from spawner import ACTIVE_NOTES # Import global memory tracker
+from editor import SmartEditor # Handles URI parsing and custom drag events
 
 class ModernSizeGrip(QSizeGrip):
     """Custom painted size grip providing a premium, native-looking resize indicator."""
@@ -66,7 +67,7 @@ class StickyNote(QMainWindow):
         self.header.set_theme(accent_bg, base_border, base_text)
         
         # 2. Instantiate Text Editor
-        self.text_editor = QTextEdit(self.container)
+        self.text_editor = SmartEditor(self.container)
         self.text_editor.setStyleSheet(f"background: transparent; border: none; padding: 8px; font-size: 14px; color: {base_text};")
         self.text_editor.textChanged.connect(self._adjust_height)
 
