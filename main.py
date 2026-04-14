@@ -18,6 +18,41 @@ from security import Vault
 from ui.lockscreen import AuthFlowDialog
 from ui.dashboard import Dashboard
 
+# Upgraded sys.excepthook to intercept crashes, print them, and log them cleanly to floatslate.db
+import traceback
+
+def global_exception_hook(exctype, value, tb):
+    """Catches PyQt6 crashes, prints to terminal, and logs to the local database."""
+    
+    # --- The Ghost Shield ---
+    # If the IDE or terminal throws a fake Ctrl+C, ignore it entirely!
+    if exctype is KeyboardInterrupt:
+        print("\n⚡ [Shield] Neutralized a ghost IDE KeyboardInterrupt. App continues running.\n")
+        return
+
+    # 1. Format the error into a readable string
+    traceback_str = "".join(traceback.format_exception(exctype, value, tb))
+    
+    # 2. Print to terminal for live debugging
+    print("\n" + "="*50)
+    print("🚨 CRITICAL APPLICATION CRASH 🚨")
+    print(traceback_str)
+    print("="*50 + "\n")
+    
+    # 3. Save to the database
+    try:
+        from database import DatabaseManager
+        # Spin up an independent DB connection just for the crash report
+        crash_db = DatabaseManager() 
+        crash_db.log_crash(traceback_str)
+    except Exception as e:
+        print(f"Telemetry Failure: Could not save crash to DB. {e}")
+        
+    # 4. Abort the program safely
+    sys.exit(1)
+
+sys.excepthook = global_exception_hook
+
 class ModernSizeGrip(QSizeGrip):
     """Pure CSS Size Grip to bypass C++ QPainter deadlocks. Relies on native Cursor UX."""
     def __init__(self, parent=None):
@@ -328,7 +363,7 @@ class StickyNote(QMainWindow):
             self.db.upsert_note(data)
 
 def main() -> None:
-    # --- NEW: Windows Taskbar Icon Fix ---
+    # --- Windows Taskbar Icon Fix ---
     # Forces Windows to group this as a unique app instead of "python.exe"
     if sys.platform == "win32":
         import ctypes

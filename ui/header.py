@@ -8,22 +8,26 @@ from PyQt6.QtGui import QMouseEvent
 
 from ui.controls import WindowControls
 from ui.spawner import SpawnButton
+from ui.utils import load_colored_svg
 
 class EditButton(QPushButton):
-    """Minimalist inline button to trigger the title edit state."""
     def __init__(self):
-        super().__init__("✎") # Unicode pencil glyph
-        self.setFixedSize(20, 20)
+        super().__init__()
+        # 1. Change these numbers to resize the button's clickable area
+        self.setFixedSize(22, 22) 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def set_theme(self, text_hex: str) -> None:
+        self.setIcon(load_colored_svg("edit.svg", text_hex))
+        
+        # 2. This controls the actual scale of the SVG inside the button.
+        from PyQt6.QtCore import QSize
+        self.setIconSize(QSize(12, 12)) 
+        
         self.setStyleSheet(f"""
             QPushButton {{
                 border: none;
                 background: transparent;
-                color: {text_hex};
-                font-family: 'Segoe UI Symbol', sans-serif;
-                font-size: 12px;
             }}
             QPushButton:hover {{
                 background-color: rgba(0, 0, 0, 0.08);

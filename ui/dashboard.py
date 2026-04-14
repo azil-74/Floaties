@@ -42,7 +42,7 @@ class NoteItemWidget(QWidget):
                 border: 1px solid #F1C40F; 
             }
         """)
-        self.checkbox.toggled.connect(self.dashboard._update_action_buttons_visibility)
+        self.checkbox.toggled.connect(self._on_check_toggled)
         
         text_col = QVBoxLayout()
         text_col.setSpacing(2)
@@ -99,6 +99,20 @@ class NoteItemWidget(QWidget):
 
     def _delete_self(self) -> None:
         self.dashboard._delete_specific_note(self.note_data)
+
+    def _on_check_toggled(self, checked: bool) -> None:
+        from ui.utils import load_colored_svg
+        from PyQt6.QtCore import QSize
+        from PyQt6.QtGui import QIcon
+        
+        if checked:
+            # Inject the dark brand color to pop against the yellow background
+            self.checkbox.setIcon(load_colored_svg("check.svg", "#1A1A1A"))
+            self.checkbox.setIconSize(QSize(14, 14))
+        else:
+            self.checkbox.setIcon(QIcon())
+            
+        self.dashboard._update_action_buttons_visibility() 
 
 class PasswordUpdatedDialog(QDialog):
     """Custom, branded dialog for revealing the new recovery key after rotation."""
@@ -382,11 +396,34 @@ class Dashboard(QMainWindow):
         l.setContentsMargins(0, 0, 0, 0)
         
         self.search_bar = QLineEdit()
-        self.search_bar.setPlaceholderText("Search notes...")
+        self.search_bar.setPlaceholderText("Search your vault...")
+        
+        # 1. Shift the typing area to the right so it doesn't overlap our new icon position
+        self.search_bar.setTextMargins(42, 0, 0, 0) 
+        
+        from ui.utils import load_colored_svg
+        search_icon = load_colored_svg("search.svg", "#888888")
+        
+        if not search_icon.isNull():
+            # 2. Use an internal layout for pixel-perfect icon placement
+            icon_layout = QHBoxLayout(self.search_bar)
+            
+            # 19px left margin perfectly aligns the icon with the checkboxes below
+            icon_layout.setContentsMargins(19, 0, 0, 0) 
+            
+            search_label = QLabel()
+            search_label.setPixmap(search_icon.pixmap(16, 16))
+            search_label.setFixedSize(16, 16)
+            search_label.setStyleSheet("border: none; background: transparent;")
+            
+            icon_layout.addWidget(search_label)
+            icon_layout.addStretch() # Pushes the icon to stay on the left
+            
         self.search_bar.textChanged.connect(self._filter_notes)
         
         self.list_notes = QListWidget()
-        self.list_notes.itemDoubleClicked.connect(lambda item: self._launch_note_instance(item.data(Qt.ItemDataRole.UserRole)))
+        # ACTION: Removed the lambda to attach a robust error-catching method
+        self.list_notes.itemDoubleClicked.connect(self._handle_note_open)
         
         btn_row = QHBoxLayout()
         
@@ -396,16 +433,15 @@ class Dashboard(QMainWindow):
         btn_spawn_new.setFixedWidth(36) 
         btn_spawn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        # Safely resolve the path to the new SVG asset
-        from PyQt6.QtGui import QIcon
-        from pathlib import Path
-        plus_icon_path = Path(__file__).parent.parent / "assets" / "plus.svg"
+        # Inject the custom #1A1A1A dark color to contrast the yellow background
+        from ui.utils import load_colored_svg
+        icon = load_colored_svg("plus.svg", "#1A1A1A")
         
-        if plus_icon_path.exists():
-            btn_spawn_new.setIcon(QIcon(str(plus_icon_path)))
-            btn_spawn_new.setIconSize(QSize(20, 20)) # Perfect size for the 36px box
+        if not icon.isNull():
+            btn_spawn_new.setIcon(icon)
+            btn_spawn_new.setIconSize(QSize(16, 16)) # Scaled slightly to match the 12x12 minimalist aesthetic
         else:
-            btn_spawn_new.setText("+") # Failsafe just in case the file gets moved
+            btn_spawn_new.setText("+") # Failsafe
             
         btn_spawn_new.setStyleSheet("""
             QPushButton { 
@@ -506,9 +542,23 @@ class Dashboard(QMainWindow):
         """)
         btn_export.clicked.connect(self._export_vault)
 
+        # --- NEW: Crash Logs Button ---
+        btn_export_logs = QPushButton("Export Crash Logs")
+        btn_export_logs.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export_logs.setStyleSheet("""
+            QPushButton { background: transparent; color: #F1C40F; border: 1px solid #F1C40F; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { background: rgba(241, 196, 15, 0.1); }
+        """)
+        btn_export_logs.clicked.connect(self._export_crash_logs)
+
+        # Place them side-by-side
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(btn_export)
+        btn_row.addWidget(btn_export_logs)
+
         export_layout.addWidget(lbl_export)
         export_layout.addWidget(desc_export)
-        export_layout.addWidget(btn_export)
+        export_layout.addLayout(btn_row)
 
         l.addWidget(self.btn_toggle_security)
         l.addWidget(self.sec_container)
@@ -541,6 +591,31 @@ class Dashboard(QMainWindow):
                 )
             except Exception as e:
                 QMessageBox.critical(self, "Export Failed", f"Could not create backup: {e}")
+
+    def _export_crash_logs(self) -> None:
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        from datetime import datetime
+
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        suggested_name = f"Floaties_CrashLogs_{date_str}.txt"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Crash Logs", suggested_name, "Text Files (*.txt);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+        
+        if file_path:
+            success = self.db.export_crash_logs(file_path)
+            if success:
+                QMessageBox.information(
+                    self, "Export Successful", 
+                    "Crash logs exported successfully.\n\nYou can securely share this file with the developer."
+                )
+            else:
+                QMessageBox.information(
+                    self, "System Stable", 
+                    "There are no crash logs to export. Your application is perfectly healthy!"
+                )
 
     def _build_about_view(self) -> QWidget:
         w = QWidget()
@@ -596,7 +671,8 @@ class Dashboard(QMainWindow):
             }
             QPushButton:hover { background: #D4AC0D; }
         """)
-        btn_donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/therealazil")))
+        # ACTION: Removed the lambda to prevent silent C++ crashes on Wayland/Linux
+        btn_donate.clicked.connect(self._open_support_link)
         
         l.addWidget(title)
         l.addSpacing(16)
@@ -606,6 +682,21 @@ class Dashboard(QMainWindow):
         l.addWidget(btn_donate)
         l.addStretch()
         return w
+    
+    def _open_support_link(self) -> None:
+        """Safely asks the native OS to open the default web browser."""
+        from PyQt6.QtGui import QDesktopServices
+        from PyQt6.QtCore import QUrl
+        try:
+            # Safely hand off the URL to the operating system
+            url = QUrl("https://ko-fi.com/therealazil")
+            success = QDesktopServices.openUrl(url)
+            
+            if not success:
+                print("OS refused to open the URL. (Check default browser settings)")
+        except Exception as e:
+            # If Wayland/Windows fails to find a browser, we catch it gracefully instead of crashing
+            print(f"🚨 Browser routing failed: {e}")
 
     # --- Interaction Logic ---
 
@@ -684,7 +775,19 @@ class Dashboard(QMainWindow):
 
     def _spawn_empty_note(self) -> None:
         self._launch_note_instance(None)
-
+    
+    # ERROR CATCHER TEMPORARY
+    def _handle_note_open(self, item) -> None:
+        """Robust wrapper to catch silent PyQt6 slot exceptions."""
+        try:
+            note_data = item.data(Qt.ItemDataRole.UserRole)
+            self._launch_note_instance(note_data)
+        except Exception as e:
+            import traceback
+            print("\n" + "="*40)
+            print("🚨 REAL CRASH TRACEBACK REVEALED 🚨")
+            traceback.print_exc()
+            print("="*40 + "\n")
     # Save Notes: Dashboard Note Spawner Patch
 # Target: ui/dashboard.py -> Dashboard class
 # Action: Resolved SQLite NULL ID crash. Implemented decoupled O(1) theme cycling via event signals.
@@ -709,7 +812,8 @@ class Dashboard(QMainWindow):
             # 2. O(1) Decoupled Theme Cycling
             if PRESET_THEMES:
                 theme_count = len(PRESET_THEMES)
-                selected_theme = PRESET_THEMES[len(ACTIVE_NOTES) % theme_count]
+                # Action: Offset the cycle by 6 to ensure the first note is Charcoal/Black
+                selected_theme = PRESET_THEMES[(len(ACTIVE_NOTES) + 6) % theme_count]
                 
                 bg_hex = selected_theme["bg"]
                 border_hex = selected_theme["border"]

@@ -65,6 +65,53 @@ class DatabaseManager:
                 cur.execute("ALTER TABLE notes ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP")
             except sqlite3.OperationalError:
                 pass # Column already exists, proceed normally
+                
+            # --- Crash Telemetry Table ---
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS crash_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    traceback TEXT
+                )
+            """)
+
+    def log_crash(self, traceback_str: str) -> None:
+        """Safely writes a crash log to the database using the atomic context manager."""
+        try:
+            with self.transaction() as cur:
+                cur.execute("INSERT INTO crash_logs (traceback) VALUES (?)", (traceback_str,))
+        except Exception as e:
+            # Failsafe: Print to terminal if SQLite is completely locked during a hard crash
+            print(f"Failed to write crash to database: {e}")
+
+    def cleanup_old_logs(self, days: int = 30) -> None:
+        """Purges crash logs older than the specified number of days."""
+        try:
+            with self.transaction() as cur:
+                cur.execute(
+                    "DELETE FROM crash_logs WHERE timestamp < datetime('now', ?)", 
+                    (f'-{days} days',)
+                )
+                # Recover unused space after deletion
+                cur.execute("VACUUM;")
+        except Exception as e:
+            print(f"Background maintenance failed: {e}")
+    
+    def export_crash_logs(self, file_path: str) -> bool:
+        """Exports all telemetry data to a plain text file."""
+        with self.transaction() as cur:
+            cur.execute("SELECT timestamp, traceback FROM crash_logs ORDER BY id DESC")
+            rows = cur.fetchall()
+            
+            if not rows:
+                return False
+                
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write("=== FLOATIES CRASH TELEMETRY ===\n\n")
+                for row in rows:
+                    f.write(f"[{row[0]}]\n{row[1]}\n")
+                    f.write("-" * 50 + "\n\n")
+            return True
 
     def get_meta(self, key: str) -> Optional[bytes]:
         with self.transaction() as cur:

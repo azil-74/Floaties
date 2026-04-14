@@ -1,23 +1,24 @@
-# Save Notes: Window State Controls
+# Save Notes: Window State Controls (SVG Edition)
 # Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Migrated Hamburger Menu to Footer to resolve header congestion.
+# Action: Replaced Unicode text with dynamic SVG injection. Added Size Experimentation zones.
 
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QMainWindow
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from ui.utils import load_colored_svg
 
 class ModernButton(QPushButton):
     rightClicked = pyqtSignal()
 
     def __init__(self, icon_type: str):
-        text_map = {
-            "close": "✕",
-            "rollup": "▴",
-            "rolldown": "▾"
-        }
-        super().__init__(text_map.get(icon_type, ""))
+        super().__init__()
         self.icon_type = icon_type
-        self.setFixedSize(28, 24)
+        
+        # --- SIZE EXPERIMENTATION (CONTAINER) ---
+        # Adjust these numbers to change the clickable 'hitbox' of the button.
+        self.setFixedSize(28, 24) 
+        
         self.is_close = (icon_type == "close")
+        self.current_text_hex = "#000000"
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.RightButton:
@@ -25,24 +26,40 @@ class ModernButton(QPushButton):
         elif event.button() == Qt.MouseButton.LeftButton:
             super().mouseReleaseEvent(event)
 
+    def enterEvent(self, event):
+        # Native OS feel: Turn the 'X' white when hovering over the red close button
+        if self.is_close:
+            self.setIcon(load_colored_svg("close.svg", "#FFFFFF"))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        # Revert back to the theme's text color when the mouse leaves
+        if self.is_close:
+            self.setIcon(load_colored_svg("close.svg", self.current_text_hex))
+        super().leaveEvent(event)
+
     def set_theme(self, text_hex: str) -> None:
+        self.current_text_hex = text_hex
+        
+        # Determine which SVG to load
+        svg_file = "close.svg" if self.is_close else "minimize.svg"
+        self.setIcon(load_colored_svg(svg_file, text_hex))
+        
+        # --- SIZE EXPERIMENTATION (ICON) ---
+        # Adjust these numbers to change the scale of the drawn SVG inside the button.
+        # Ensure it is slightly smaller than the Container size above.
+        self.setIconSize(QSize(12, 12) if self.is_close else QSize(14, 14))
+        
         hover_bg = "#E81123" if self.is_close else "rgba(0, 0, 0, 0.08)"
-        hover_color = "#FFFFFF" if self.is_close else text_hex
-        font_size = "12px" if self.is_close else "14px"
         
         self.setStyleSheet(f"""
             QPushButton {{
                 border: none;
                 background: transparent;
                 border-radius: 4px;
-                color: {text_hex};
-                font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
-                font-size: {font_size};
-                font-weight: normal;
             }}
             QPushButton:hover {{
                 background-color: {hover_bg};
-                color: {hover_color};
             }}
         """)
 
@@ -70,4 +87,5 @@ class WindowControls(QWidget):
         self.btn_close.set_theme(text_hex)
         
     def update_rollup_icon(self, is_rolled_up: bool) -> None:
-        self.btn_min_combined.setText("▾" if is_rolled_up else "▴")
+        # With a minimalist SVG dash for minimize/rollup, we no longer need to flip text arrows.
+        pass

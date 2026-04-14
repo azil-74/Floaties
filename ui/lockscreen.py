@@ -314,10 +314,15 @@ class AuthFlowDialog(QDialog):
         self.btn_setup.setEnabled(False)
         self.inp_setup_pwd.setEnabled(False)
         self.btn_setup.setText("Preparing...")
-        QApplication.processEvents()
-        QTimer.singleShot(50, lambda: self._execute_setup_crypto(pwd))
+        
+        # ACTION: Removed processEvents() to stop VS Code debugger panics.
+        # QTimer naturally yields to the event loop, so the UI will update on its own!
+        QTimer.singleShot(50, self._execute_setup_crypto)
 
-    def _execute_setup_crypto(self, pwd: str) -> None:
+    def _execute_setup_crypto(self) -> None:
+        # Read the password directly from the locked UI field
+        pwd = self.inp_setup_pwd.text().strip()
+        
         self.salt = Vault.generate_salt()
         self.db.set_meta("salt", self.salt)
         token = Vault.encrypt("VALID", pwd, self.salt)
@@ -340,10 +345,14 @@ class AuthFlowDialog(QDialog):
         
         self.lbl_login_err.setStyleSheet("color: #F1C40F;")
         self.lbl_login_err.setText("Loading...")
-        QApplication.processEvents()
-        QTimer.singleShot(100, lambda: self._execute_login_crypto(pwd))
+        
+        # ACTION: Removed processEvents() to stop VS Code debugger panics.
+        QTimer.singleShot(100, self._execute_login_crypto)
 
-    def _execute_login_crypto(self, pwd: str) -> None:
+    def _execute_login_crypto(self) -> None:
+        # Read the password directly from the locked UI field
+        pwd = self.inp_login_pwd.text().strip()
+        
         token = self.db.get_meta("val_token")
         if token is None or self.salt is None:
             self._reset_login("Critical Error: App token missing.")
@@ -383,7 +392,8 @@ class AuthFlowDialog(QDialog):
         self.btn_recover.setEnabled(False)
         self.lbl_rec_err.setStyleSheet("color: #F1C40F;")
         self.lbl_rec_err.setText("Verifying...")
-        QApplication.processEvents()
+        
+        # ACTION: Removed processEvents() to stop VS Code debugger panics.
         
         rec_salt = self.db.get_meta("recovery_salt")
         enc_pwd = self.db.get_meta("rec_enc_pwd")
