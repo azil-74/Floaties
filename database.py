@@ -1,6 +1,6 @@
-# Save Notes: The Persistence Engine (Phase 2 - SQLite WAL Engine)
+# Save Notes: The Persistence Engine 
 # Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Implemented strict atomic transactions, WAL mode, and singleton metadata table.
+# Action: Injected safe ALTER TABLE migration for created_at timestamps.
 
 import sqlite3
 import logging
@@ -19,17 +19,8 @@ class DatabaseManager:
 
     @contextmanager
     def transaction(self) -> Generator[sqlite3.Cursor, None, None]:
-        """
-        Provides an atomic transaction boundary. 
-        Auto-commits on success, auto-rolls back on Python exceptions.
-        """
-        # isolation_level=None disables sqlite3's implicit transaction management,
-        # allowing us to manually enforce BEGIN/COMMIT for strict atomicity.
         conn = sqlite3.connect(self.db_path, isolation_level=None)
-        
-        # Enforce WAL mode for concurrent read/write stability and crash resistance
         conn.execute("PRAGMA journal_mode=WAL;")
-        # NORMAL synchronous is safe in WAL mode and much faster than FULL
         conn.execute("PRAGMA synchronous=NORMAL;")
         
         cursor = conn.cursor()
@@ -46,9 +37,7 @@ class DatabaseManager:
             conn.close()
 
     def _init_db(self) -> None:
-        """Bootstraps the required tables if they do not exist."""
         with self.transaction() as cur:
-            # Table 1: Global App Metadata (Salt, Schema Versions, etc.)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS app_meta (
                     key TEXT PRIMARY KEY,
@@ -56,32 +45,34 @@ class DatabaseManager:
                 )
             """)
             
-            # Table 2: The Vault Payload & Geometrics
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS notes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT NOT NULL,
-                    content BLOB, -- Encrypted Payload from security.py
+                    content BLOB, 
                     theme_index INTEGER NOT NULL DEFAULT 6,
                     pos_x INTEGER NOT NULL DEFAULT 0,
                     pos_y INTEGER NOT NULL DEFAULT 0,
                     width INTEGER NOT NULL DEFAULT 200,
                     height INTEGER NOT NULL DEFAULT 300,
-                    is_rolled_up BOOLEAN NOT NULL CHECK (is_rolled_up IN (0, 1)) DEFAULT 0
+                    is_rolled_up BOOLEAN NOT NULL CHECK (is_rolled_up IN (0, 1)) DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            
+            # Non-destructive migration for existing databases
+            try:
+                cur.execute("ALTER TABLE notes ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP")
+            except sqlite3.OperationalError:
+                pass # Column already exists, proceed normally
 
-    # --- App Metadata Operations ---
-    
     def get_meta(self, key: str) -> Optional[bytes]:
-        """Retrieves a global metadata BLOB (e.g., the decryption salt)."""
         with self.transaction() as cur:
             cur.execute("SELECT value FROM app_meta WHERE key = ?", (key,))
             row = cur.fetchone()
             return row[0] if row else None
 
     def set_meta(self, key: str, value: bytes) -> None:
-        """Upserts a global metadata BLOB."""
         with self.transaction() as cur:
             cur.execute("""
                 INSERT INTO app_meta (key, value) 
@@ -89,13 +80,7 @@ class DatabaseManager:
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
             """, (key, value))
 
-    # --- Note CRUD Operations ---
-
     def upsert_note(self, note_data: Dict[str, Any]) -> int:
-        """
-        Inserts a new note or updates an existing one. 
-        Returns the row ID.
-        """
         with self.transaction() as cur:
             if note_data.get("id") is None:
                 cur.execute("""
@@ -119,10 +104,8 @@ class DatabaseManager:
                 return note_data["id"]
 
     def load_all_notes(self) -> List[Dict[str, Any]]:
-        """Retrieves all notes for the boot-phase restoration."""
         with self.transaction() as cur:
-            # Using dict mapping to pass clean kwargs directly to UI instances
-            cur.execute("SELECT id, title, content, theme_index, pos_x, pos_y, width, height, is_rolled_up FROM notes")
+            cur.execute("SELECT id, title, content, theme_index, pos_x, pos_y, width, height, is_rolled_up, created_at FROM notes")
             rows = cur.fetchall()
             
             return [
@@ -135,21 +118,17 @@ class DatabaseManager:
                     "pos_y": r[5],
                     "width": r[6],
                     "height": r[7],
-                    "is_rolled_up": bool(r[8])
+                    "is_rolled_up": bool(r[8]),
+                    "created_at": r[9]
                 }
                 for r in rows
             ]
 
     def delete_note(self, note_id: int) -> None:
-        """Permanently purges a note from the database."""
         with self.transaction() as cur:
             cur.execute("DELETE FROM notes WHERE id = ?", (note_id,))
 
     def update_all_notes_atomic(self, notes_data: List[Dict[str, Any]]) -> None:
-        """
-        OWASP/ACID Compliance: Bulk updates all notes in a single WAL transaction.
-        If any encryption fails, the entire database rolls back to the previous key state.
-        """
         with self.transaction() as cur:
             for note in notes_data:
                 cur.execute("""
