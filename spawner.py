@@ -1,9 +1,10 @@
 # Save Notes: Window Spawner (Pure CSS / Modern Typography)
 # Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Stripped QtAwesome to bypass Windows GDI deadlock.
+# Action: Implemented typing.cast to satisfy Pylance strict type checking on QMainWindow attributes.
 
 from PyQt6.QtWidgets import QPushButton, QMainWindow
 from PyQt6.QtCore import QPoint
+from typing import cast
 from toolbar import PRESET_THEMES
 
 ACTIVE_NOTES = set()
@@ -24,9 +25,21 @@ class SpawnButton(QPushButton):
         
         from main import StickyNote 
         
-        new_note = StickyNote(theme_index=theme_index)
+        # Action: Cast the generic QMainWindow to StickyNote to expose custom Vault attributes to Pylance
+        parent = cast(StickyNote, self.parent_window)
+        
+        new_note = StickyNote(
+            db=parent.db, 
+            pwd=parent.pwd, 
+            salt=parent.salt,
+            theme_index=theme_index
+        )
+        
+        # Daisy-chain the signal: Child Note -> Parent Note -> Dashboard Refresh
+        new_note.note_saved.connect(parent.note_saved.emit)
+
         ACTIVE_NOTES.add(new_note) 
-        new_note.move(self.parent_window.pos() + QPoint(30, 30))
+        new_note.move(parent.pos() + QPoint(30, 30))
         new_note.show()
         
     def set_theme(self, text_hex: str) -> None:

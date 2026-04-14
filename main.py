@@ -1,11 +1,9 @@
-# Save Notes: Core Application Entry Point
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Eradicated dynamic auto-resize for absolute window stability. 
-
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QGridLayout, QFrame, QSizeGrip
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QGridLayout, QFrame, QSizeGrip, QDialog
+)
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtGui import QColor, QMoveEvent, QResizeEvent
 
 # Import our modular ecosystem
 from toolbar import FormattingToolbar, PRESET_THEMES, get_wcag_text_color
@@ -13,6 +11,12 @@ from header import DragHeader
 from spawner import ACTIVE_NOTES 
 from editor import SmartEditor 
 from highlighter import MarkdownHighlighter 
+
+# Persistence & Security
+from database import DatabaseManager
+from security import Vault
+from lockscreen import AuthFlowDialog
+from dashboard import Dashboard
 
 class ModernSizeGrip(QSizeGrip):
     """Pure CSS Size Grip to bypass C++ QPainter deadlocks. Relies on native Cursor UX."""
@@ -28,14 +32,87 @@ class ModernSizeGrip(QSizeGrip):
             }
         """)
 
-class StickyNote(QMainWindow):
-    """Core Sticky Note Window adhering to Single Responsibility Principle."""
-    def __init__(self, theme_index: int = 6) -> None:
+class SaveWorker(QThread):
+    """Isolated background thread for heavy Argon2id cryptography and SQLite I/O."""
+    finished_save = pyqtSignal(object) 
+    error_save = pyqtSignal(str)
+
+    def __init__(self, db, pwd: str, salt: bytes, note_data: dict):
         super().__init__()
+        self.db = db
+        self.pwd = pwd
+        self.salt = salt
+        self.note_data = note_data # Contains raw text, NOT GUI objects
+
+    def run(self) -> None:
+        try:
+            from security import Vault
+            # Heavy CPU Math Phase
+            encrypted_content = Vault.encrypt(self.note_data["plain_text"], self.pwd, self.salt)
+            self.note_data["content"] = encrypted_content
+            del self.note_data["plain_text"] # Clean up memory
+            
+            # Disk I/O Phase
+            db_id = self.db.upsert_note(self.note_data)
+            self.finished_save.emit(db_id)
+        except Exception as e:
+            self.error_save.emit(str(e))
+
+class StickyNote(QMainWindow):
+    """Core Sticky Note Window with Debounced DB Sync."""
+    # NEW: Real-time sync hook
+    note_saved = pyqtSignal()
+    # Action: Changed 'dict = None' to 'dict | None = None'
+    def __init__(self, db: DatabaseManager, pwd: str, salt: bytes, theme_index: int = 6, note_data: dict | None = None) -> None:
+        super().__init__()
+        # Vault & Persistence Context
+        self.db = db
+        self.pwd = pwd
+        self.salt = salt
+        self.db_id = note_data.get("id") if note_data else None
+        
         self.is_rolled_up = False
         self._normal_height = 150 
-        self._initial_theme_index = theme_index
+        
+        if note_data:
+            self._current_theme_index = note_data.get("theme_index", theme_index)
+        else:
+            self._current_theme_index = theme_index
+            
         self._init_ui()
+        
+        # --- Lifecycle Sync State Restoration ---
+        self.save_timer = QTimer(self)
+        self.save_timer.setSingleShot(True)
+        self.save_timer.timeout.connect(self._sync_to_db)
+        
+        if note_data:
+            self.move(note_data["pos_x"], note_data["pos_y"])
+            self.resize(note_data["width"], note_data["height"])
+            self._normal_height = note_data["height"]
+            
+            self.header.title_label.setText(note_data["title"])
+            
+            if note_data["content"]:
+                self._cached_encrypted_content = note_data["content"]
+                self.text_editor.setPlainText("Decrypting payload... (Please wait)")
+                self.text_editor.setEnabled(False)
+                
+                # AUDIT FIX: Bound timer prevents segfaults if window is closed instantly
+                self.decrypt_timer = QTimer(self)
+                self.decrypt_timer.setSingleShot(True)
+                self.decrypt_timer.timeout.connect(self._execute_decryption)
+                self.decrypt_timer.start(100)
+            
+            if note_data["is_rolled_up"]:
+                self.toggle_rollup()
+                
+        # --- Attach Triggers (Post-Init to prevent boot-flooding) ---
+        self.text_editor.textChanged.connect(self._trigger_save)
+        self.header.title_changed.connect(self._trigger_save)
+        self.save_worker = None
+        self.pending_save = False # Queue flag for high-speed typing
+        
 
     def _init_ui(self) -> None:
         self.setWindowFlags(
@@ -49,8 +126,7 @@ class StickyNote(QMainWindow):
         self.container.setObjectName("NoteContainer")
         self.setCentralWidget(self.container)
 
-        # Dynamically fetch the theme based on the round-robin index
-        theme = PRESET_THEMES[self._initial_theme_index % len(PRESET_THEMES)]
+        theme = PRESET_THEMES[self._current_theme_index % len(PRESET_THEMES)]
         base_bg = theme["bg"]
         base_border = theme["border"]
         base_text = get_wcag_text_color(base_bg)
@@ -58,25 +134,20 @@ class StickyNote(QMainWindow):
 
         self.container.setStyleSheet(f"#NoteContainer {{ background-color: {base_bg}; border: 1px solid {base_border}; }}")
 
-        # 1. Instantiate Header
         self.header = DragHeader(self)
         self.header.set_theme(accent_bg, base_border, base_text)
         
-        # 2. Instantiate Text Editor
         self.text_editor = SmartEditor(self.container)
         self.text_editor.setStyleSheet(f"background: transparent; border: none; padding: 8px; font-size: 14px; color: {base_text};")
-        # ACTION: self.text_editor.textChanged connection completely removed.
 
         self.highlighter = MarkdownHighlighter(self.text_editor.document(), base_text)
 
-        # 3. Instantiate Hover-Footer Toolbar 
         self.toolbar = FormattingToolbar(self.text_editor)
         self.toolbar.theme_color_changed.connect(self._update_theme_color)
         self.toolbar.set_theme(accent_bg, base_border, base_text)
 
         self.size_grip = ModernSizeGrip(self.container)
 
-        # --- Modular Layout Construction ---
         main_layout = QGridLayout(self.container)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -87,9 +158,84 @@ class StickyNote(QMainWindow):
         
         main_layout.addWidget(self.size_grip, 2, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
         self.size_grip.raise_()
+    
+    def _execute_decryption(self) -> None:
+        """Runs the heavy Argon2id decryption after the window has safely rendered."""
+        try:
+            decrypted_text = Vault.decrypt(self._cached_encrypted_content, self.pwd, self.salt)
+            self.text_editor.setPlainText(decrypted_text)
+        except ValueError:
+            self.text_editor.setPlainText("[ERROR: Vault Decryption Failed]")
+        finally:
+            self.text_editor.setEnabled(True)
+            self.text_editor.setFocus()
+            # Explicitly delete the cached encrypted byte array
+            if hasattr(self, '_cached_encrypted_content'):
+                del self._cached_encrypted_content
+
+    # --- Database I/O Hooks ---
+    def _trigger_save(self) -> None:
+        """Debounces continuous events to prevent SQL/I-O lockups."""
+        if hasattr(self, 'save_timer'):
+            self.save_timer.start(1000)
+
+    # ... inside StickyNote.__init__ (add to the bottom of the method) ...
+        self.save_worker = None
+        self.pending_save = False # Queue flag for high-speed typing
+        
+    # ... replace existing _sync_to_db with this threaded version ...
+    def _sync_to_db(self) -> None:
+        """Packages GUI state and dispatches it to the background cryptography thread."""
+        if not hasattr(self, 'db') or not self.db:
+            return
+
+        # Concurrency Lock: If thread is busy, queue the save for later.
+        if self.save_worker is not None and self.save_worker.isRunning():
+            self.pending_save = True
+            return
+
+        # 1. Extract all state on the Main GUI Thread (CRITICAL for Wayland/Windows stability)
+        raw_data = {
+            "id": self.db_id,
+            "title": self.header.title_label.text(),
+            "plain_text": self.text_editor.toPlainText(),
+            "theme_index": self._current_theme_index,
+            "pos_x": self.pos().x(),
+            "pos_y": self.pos().y(),
+            "width": self.width(),
+            "height": self._normal_height,
+            "is_rolled_up": int(self.is_rolled_up)
+        }
+
+        # 2. Dispatch to Background Core
+        self.save_worker = SaveWorker(self.db, self.pwd, self.salt, raw_data)
+        self.save_worker.finished_save.connect(self._on_save_finished)
+        # AUDIT FIX: Force C++ to safely delete the thread object from RAM when finished
+        self.save_worker.finished.connect(self.save_worker.deleteLater)
+        self.save_worker.start()
+
+    def _on_save_finished(self, new_db_id: int) -> None:
+        """Callback executed strictly on the Main Thread when crypto finishes."""
+        self.db_id = new_db_id
+        self.note_saved.emit() # Ping dashboard live UI update
+        
+        # AUDIT FIX: Sever the Python reference so it never queries a dead C++ object
+        self.save_worker = None 
+        
+        # If the user typed more while the thread was busy, instantly run the queued save
+        if getattr(self, 'pending_save', False):
+            self.pending_save = False
+            self._sync_to_db()
+
+    def moveEvent(self, event: QMoveEvent) -> None:
+        super().moveEvent(event)
+        self._trigger_save()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._trigger_save()
 
     def toggle_rollup(self) -> None:
-        """Soft-minimizes the window to just the header."""
         if not self.is_rolled_up:
             self._normal_height = self.height()
             self.text_editor.setVisible(False)
@@ -109,13 +255,25 @@ class StickyNote(QMainWindow):
             self.resize(self.width(), self._normal_height)
             
         self.header.window_controls.update_rollup_icon(self.is_rolled_up)
+        self._trigger_save()
 
     def closeEvent(self, event) -> None:
-        """Hooks into the native close event to ensure garbage collection memory safety."""
         ACTIVE_NOTES.discard(self)
+        
+        # Cache the real title before we visually alter it!
+        real_title = self.header.title_label.text()
+        
+        if (self.save_worker is not None and self.save_worker.isRunning()) or \
+           (hasattr(self, 'save_timer') and self.save_timer.isActive()) or \
+           getattr(self, 'pending_save', False):
+            self.header.title_label.setText("Securing...")
+            from PyQt6.QtWidgets import QApplication
+            QApplication.processEvents()
+        
+        # Pass the real title to the save function so it doesn't save "Securing..."
+        self.force_sync_save_for_shutdown(real_title)
+            
         super().closeEvent(event)
-
-    # ACTION: _adjust_height completely deleted.
 
     def _update_theme_color(self, bg_hex: str, border_hex: str, text_hex: str) -> None:
         self.container.setStyleSheet(f"#NoteContainer {{ background-color: {bg_hex}; border: 1px solid {border_hex}; }}")
@@ -124,12 +282,78 @@ class StickyNote(QMainWindow):
         self.header.set_theme(accent_bg, border_hex, text_hex)
         self.toolbar.set_theme(accent_bg, border_hex, text_hex)
         self.text_editor.setStyleSheet(f"background: transparent; border: none; padding: 8px; font-size: 14px; color: {text_hex};")
+        
+        for i, theme in enumerate(PRESET_THEMES):
+            if theme["bg"] == bg_hex:
+                self._current_theme_index = i
+                break
+        self._trigger_save()
+
+    def force_sync_save_for_shutdown(self, actual_title: str | None = None) -> None:
+        """Synchronous fallback exclusively for app shutdown."""
+        
+        # AUDIT FIX: Bypass save entirely if Dashboard triggered a deletion
+        if getattr(self, '_is_being_deleted', False):
+            return
+
+        if self.save_worker is not None and self.save_worker.isRunning():
+            # AUDIT FIX: Disconnect signals before waiting to prevent post-mortem ghost execution
+            try:
+                self.save_worker.finished_save.disconnect()
+            except TypeError:
+                pass # Failsafe if already disconnected
+            self.save_worker.wait() 
+
+        if (hasattr(self, 'save_timer') and self.save_timer.isActive()) or getattr(self, 'pending_save', False):
+            if hasattr(self, 'save_timer'):
+                self.save_timer.stop()
+            
+            from security import Vault
+            plain_text = self.text_editor.toPlainText()
+            encrypted_content = Vault.encrypt(plain_text, self.pwd, self.salt)
+            
+            final_title = actual_title if actual_title else self.header.title_label.text()
+            
+            data = {
+                "id": self.db_id,
+                "title": final_title,
+                "content": encrypted_content,
+                "theme_index": self._current_theme_index,
+                "pos_x": self.pos().x(),
+                "pos_y": self.pos().y(),
+                "width": self.width(),
+                "height": self._normal_height,
+                "is_rolled_up": int(self.is_rolled_up)
+            }
+            self.db.upsert_note(data)
 
 def main() -> None:
+    # Ensure the app doesn't quit if you close all floating notes
+    QApplication.setQuitOnLastWindowClosed(False)
     app = QApplication(sys.argv)
-    note = StickyNote()
-    ACTIVE_NOTES.add(note) 
-    note.show()
+    
+    db = DatabaseManager()
+    
+    lock = AuthFlowDialog(db)
+    if lock.exec() != QDialog.DialogCode.Accepted:
+        sys.exit(0)
+        
+    pwd = lock.password
+    salt = lock.salt
+    
+    if not pwd or not salt:
+        sys.exit(1)
+    
+    # Action: Spawn the central dashboard instead of all notes
+    global dashboard_instance 
+    dashboard_instance = Dashboard(db=db, pwd=pwd, salt=salt)
+    dashboard_instance.show()
+    
+    # Tie the application lifecycle to the dashboard
+    dashboard_instance.destroyed.connect(app.quit)
+    # Re-enable quit on last window closed so closing the dashboard exits the app
+    QApplication.setQuitOnLastWindowClosed(True)
+            
     sys.exit(app.exec())
 
 if __name__ == "__main__":
