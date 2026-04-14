@@ -6,17 +6,17 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt6.QtGui import QColor, QMoveEvent, QResizeEvent
 
 # Import our modular ecosystem
-from toolbar import FormattingToolbar, PRESET_THEMES, get_wcag_text_color
-from header import DragHeader
-from spawner import ACTIVE_NOTES 
-from editor import SmartEditor 
-from highlighter import MarkdownHighlighter 
+from ui.toolbar import FormattingToolbar, PRESET_THEMES, get_wcag_text_color
+from ui.header import DragHeader
+from ui.spawner import ACTIVE_NOTES 
+from ui.editor import SmartEditor 
+from ui.highlighter import MarkdownHighlighter 
 
 # Persistence & Security
 from database import DatabaseManager
 from security import Vault
-from lockscreen import AuthFlowDialog
-from dashboard import Dashboard
+from ui.lockscreen import AuthFlowDialog
+from ui.dashboard import Dashboard
 
 class ModernSizeGrip(QSizeGrip):
     """Pure CSS Size Grip to bypass C++ QPainter deadlocks. Relies on native Cursor UX."""
@@ -328,9 +328,29 @@ class StickyNote(QMainWindow):
             self.db.upsert_note(data)
 
 def main() -> None:
+    # --- NEW: Windows Taskbar Icon Fix ---
+    # Forces Windows to group this as a unique app instead of "python.exe"
+    if sys.platform == "win32":
+        import ctypes
+        myappid = 'floaties.app.core.1' 
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    # -------------------------------------
+
     # Ensure the app doesn't quit if you close all floating notes
     QApplication.setQuitOnLastWindowClosed(False)
     app = QApplication(sys.argv)
+    
+    # --- NEW: Set Global Application Icon ---
+    from PyQt6.QtGui import QIcon
+    from pathlib import Path
+    
+    # Dynamically resolve the absolute path to the icon
+    icon_path = Path(__file__).parent / "assets" / "Floaties.png"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
+    else:
+        print(f"Warning: Icon not found at {icon_path}")
+    # --------------------------------------
     
     db = DatabaseManager()
     
@@ -344,14 +364,11 @@ def main() -> None:
     if not pwd or not salt:
         sys.exit(1)
     
-    # Action: Spawn the central dashboard instead of all notes
     global dashboard_instance 
     dashboard_instance = Dashboard(db=db, pwd=pwd, salt=salt)
     dashboard_instance.show()
     
-    # Tie the application lifecycle to the dashboard
     dashboard_instance.destroyed.connect(app.quit)
-    # Re-enable quit on last window closed so closing the dashboard exits the app
     QApplication.setQuitOnLastWindowClosed(True)
             
     sys.exit(app.exec())

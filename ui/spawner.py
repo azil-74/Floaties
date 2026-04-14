@@ -5,7 +5,7 @@
 from PyQt6.QtWidgets import QPushButton, QMainWindow
 from PyQt6.QtCore import QPoint
 from typing import cast
-from toolbar import PRESET_THEMES
+from ui.toolbar import PRESET_THEMES
 
 ACTIVE_NOTES = set()
 SPAWN_COUNT = 0

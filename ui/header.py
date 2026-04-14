@@ -6,8 +6,8 @@ from PyQt6.QtWidgets import QFrame, QHBoxLayout, QMainWindow, QLineEdit, QLabel,
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
 
-from controls import WindowControls
-from spawner import SpawnButton
+from ui.controls import WindowControls
+from ui.spawner import SpawnButton
 
 class EditButton(QPushButton):
     """Minimalist inline button to trigger the title edit state."""

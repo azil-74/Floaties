@@ -1,12 +1,12 @@
 # Floaties Dashboard 
-# Action: Dynamic action buttons, robust item delete UI, Base64 SVG Checkmarks, and Timestamp parsing.
+# Action: Applied universal Golden Yellow / Dark theme for brand consistency.
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
     QLabel, QPushButton, QListWidget, QListWidgetItem, QStackedWidget,
-    QMessageBox, QApplication, QCheckBox, QFrame, QStyle
+    QMessageBox, QApplication, QCheckBox, QFrame, QStyle, QDialog
 )
-from PyQt6.QtCore import Qt, QUrl, QSize
+from PyQt6.QtCore import Qt, QUrl, QSize, QTimer
 from PyQt6.QtGui import QDesktopServices
 from database import DatabaseManager
 from security import Vault
@@ -14,7 +14,6 @@ import secrets
 from datetime import datetime
 
 class NoteItemWidget(QWidget):
-    """Custom UI using Native OS Standard Icons and bulletproof typography."""
     def __init__(self, note_data: dict, dashboard_ref):
         super().__init__()
         self.note_data = note_data
@@ -24,37 +23,33 @@ class NoteItemWidget(QWidget):
         layout.setContentsMargins(12, 10, 12, 10)
         layout.setSpacing(12)
         
-        # 1. Bulletproof Checkbox (Strict RGBA Color Toggling)
-        self.checkbox = QPushButton("✓")
+        self.checkbox = QPushButton()
         self.checkbox.setCheckable(True)
-        self.checkbox.setFixedSize(22, 22) 
+        self.checkbox.setFixedSize(28, 28) 
         self.checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.checkbox.setStyleSheet("""
             QPushButton { 
+                margin: 7px; 
                 border: 1px solid #3A3A3C; 
-                border-radius: 6px; 
+                border-radius: 3px; 
                 background: #2A2A2C; 
-                color: rgba(0, 0, 0, 0); 
-                font-size: 14px; 
-                font-weight: 900;
-                padding-bottom: 2px;
+            }
+            QPushButton:hover {
+                border: 1px solid #555555;
             }
             QPushButton:checked { 
-                background: #0A84FF; 
-                border: 1px solid #0A84FF; 
-                color: #FFFFFF; 
+                background: #F1C40F; 
+                border: 1px solid #F1C40F; 
             }
         """)
         self.checkbox.toggled.connect(self.dashboard._update_action_buttons_visibility)
         
-        # 2. Text Column
         text_col = QVBoxLayout()
         text_col.setSpacing(2)
         
         self.title_label = QLabel(note_data["title"])
         self.title_label.setStyleSheet("font-size: 14px; font-weight: 500; color: #E0E0E0;")
         
-        from datetime import datetime
         raw_date = note_data.get("created_at")
         if raw_date:
             try:
@@ -71,7 +66,6 @@ class NoteItemWidget(QWidget):
         text_col.addWidget(self.title_label)
         text_col.addWidget(self.date_label)
         
-        # 3. Restrained Native Delete Button
         self.btn_delete = QPushButton()
         self.btn_delete.setFixedSize(24, 24) 
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -103,13 +97,190 @@ class NoteItemWidget(QWidget):
         layout.addStretch()
         layout.addWidget(self.btn_delete)
 
-    # ---> THE MISSING METHOD <---
     def _delete_self(self) -> None:
         self.dashboard._delete_specific_note(self.note_data)
 
+class PasswordUpdatedDialog(QDialog):
+    """Custom, branded dialog for revealing the new recovery key after rotation."""
+    def __init__(self, recovery_key: str, parent=None):
+        super().__init__(parent)
+        self.recovery_key = recovery_key
+        self._init_ui()
+
+    def _init_ui(self) -> None:
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setFixedSize(380, 260)
+        self.setStyleSheet("""
+            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QLabel { font-family: 'Segoe UI', system-ui; }
+        """)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+
+        title = QLabel("Password Updated")
+        title.setStyleSheet("color: #F1C40F; font-size: 18px; font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        desc = QLabel(
+            "Your password has been changed successfully. The old recovery code has been securely destroyed.\n\n"
+            "Please save your NEW Recovery Code:"
+        )
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("font-size: 13px; color: #E0E0E0;")
+
+        key_container = QFrame()
+        key_container.setStyleSheet("QFrame { background: #2A2A2C; border: 1px solid #3A3A3C; border-radius: 6px; }")
+        kc_layout = QHBoxLayout(key_container)
+        kc_layout.setContentsMargins(10, 4, 4, 4)
+        kc_layout.setSpacing(8)
+        
+        self.lbl_reveal_key = QLineEdit(self.recovery_key)
+        self.lbl_reveal_key.setReadOnly(True)
+        self.lbl_reveal_key.setStyleSheet("background: transparent; color: #F1C40F; font-size: 15px; font-weight: bold; border: none;")
+        
+        self.btn_copy = QPushButton("COPY")
+        self.btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy.setAutoDefault(False)
+        self.btn_copy.setStyleSheet("""
+            QPushButton { 
+                background: #3A3A3C; color: #A0A0A0; border: none; 
+                border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+            }
+            QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+        """)
+        self.btn_copy.clicked.connect(self._copy_recovery_key)
+        
+        kc_layout.addWidget(self.lbl_reveal_key)
+        kc_layout.addWidget(self.btn_copy)
+
+        self.btn_ack = QPushButton("I've saved this safely")
+        self.btn_ack.setAutoDefault(False)
+        self.btn_ack.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ack.setStyleSheet("""
+            QPushButton { 
+                background: #F1C40F; color: #1A1A1A; border: none; 
+                padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px;
+            }
+            QPushButton:hover { background: #D4AC0D; }
+        """)
+        self.btn_ack.clicked.connect(self.accept)
+
+        layout.addWidget(title)
+        layout.addSpacing(10)
+        layout.addWidget(desc)
+        layout.addStretch()
+        layout.addWidget(key_container)
+        layout.addSpacing(15)
+        layout.addWidget(self.btn_ack)
+
+    def _copy_recovery_key(self) -> None:
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(self.recovery_key)
+            self.btn_copy.setText("COPIED!")
+            self.btn_copy.setStyleSheet("""
+                QPushButton { 
+                    background: #F1C40F; color: #1A1A1A; border: none; 
+                    border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+                }
+            """)
+            QTimer.singleShot(2000, self._reset_copy_btn)
+
+    def _reset_copy_btn(self) -> None:
+        try:
+            self.btn_copy.setText("COPY")
+            self.btn_copy.setStyleSheet("""
+                QPushButton { 
+                    background: #3A3A3C; color: #A0A0A0; border: none; 
+                    border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+                }
+                QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+            """)
+        except RuntimeError:
+            pass
+
+class ExitConfirmDialog(QDialog):
+    """Custom dialog to intercept dashboard closure when notes are active."""
+    def __init__(self, active_count: int, parent=None):
+        super().__init__(parent)
+        self.choice = "cancel"
+        self.active_count = active_count
+        self._init_ui()
+
+    def _init_ui(self) -> None:
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setFixedSize(380, 220)
+        self.setStyleSheet("""
+            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QLabel { font-family: 'Segoe UI', system-ui; }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(25, 25, 25, 25)
+
+        title = QLabel("Active Notes Detected")
+        title.setStyleSheet("color: #F1C40F; font-size: 18px; font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        desc = QLabel(
+            f"Closing the dashboard will also close your {self.active_count} active floating note(s).\n\n"
+            "What would you like to do?"
+        )
+        desc.setWordWrap(True)
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("font-size: 13px; color: #E0E0E0;")
+
+        btn_row = QHBoxLayout()
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cancel.setStyleSheet("""
+            QPushButton { background: transparent; color: #A0A0A0; border: none; padding: 10px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { color: #E0E0E0; }
+        """)
+        btn_cancel.clicked.connect(self._choose_cancel)
+
+        btn_minimize = QPushButton("Minimize")
+        btn_minimize.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_minimize.setStyleSheet("""
+            QPushButton { background: #3A3A3C; color: #E0E0E0; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { background: #4A4A4C; }
+        """)
+        btn_minimize.clicked.connect(self._choose_minimize)
+
+        btn_exit = QPushButton("Exit Floaties")
+        btn_exit.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_exit.setStyleSheet("""
+            QPushButton { background: transparent; color: #FF453A; border: 1px solid #FF453A; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { background: rgba(255, 69, 58, 0.1); }
+        """)
+        btn_exit.clicked.connect(self._choose_exit)
+
+        btn_row.addWidget(btn_cancel)
+        btn_row.addWidget(btn_minimize)
+        btn_row.addWidget(btn_exit)
+
+        layout.addWidget(title)
+        layout.addSpacing(10)
+        layout.addWidget(desc)
+        layout.addStretch()
+        layout.addLayout(btn_row)
+
+    def _choose_minimize(self):
+        self.choice = "minimize"
+        self.accept()
+
+    def _choose_exit(self):
+        self.choice = "exit"
+        self.accept()
+
+    def _choose_cancel(self):
+        self.choice = "cancel"
+        self.reject()
 
 class Dashboard(QMainWindow):
-    """Clean, minimalistic central hub for managing Floaties."""
     def __init__(self, db: DatabaseManager, pwd: str, salt: bytes):
         super().__init__()
         self.db = db
@@ -123,19 +294,22 @@ class Dashboard(QMainWindow):
             QMainWindow { background-color: #1A1A1A; }
             QLabel { color: #E0E0E0; font-family: 'Segoe UI', system-ui; }
             QLineEdit { background: #2A2A2C; color: #FFF; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-size: 13px; }
-            QLineEdit:focus { border: 1px solid #0A84FF; }
+            QLineEdit:focus { border: 1px solid #F1C40F; } /* Yellow Focus */
             
             QPushButton { background: #2A2A2C; color: #E0E0E0; border: 1px solid #3A3A3C; padding: 8px 16px; border-radius: 6px; font-weight: 500; }
             QPushButton:hover { background: #353537; }
-            QPushButton#ActionBtn { background: #0A84FF; color: #FFF; border: none; font-weight: bold; }
-            QPushButton#ActionBtn:hover { background: #0070E0; }
+            
+            /* Action Buttons (Yellow with Dark Text) */
+            QPushButton#ActionBtn { background: #F1C40F; color: #1A1A1A; border: none; font-weight: bold; }
+            QPushButton#ActionBtn:hover { background: #D4AC0D; }
+            
             QPushButton#DangerBtn { background: transparent; color: #FF453A; border: 1px solid #FF453A; }
             QPushButton#DangerBtn:hover { background: rgba(255, 69, 58, 0.1); }
             
             QListWidget { background: transparent; border: none; outline: none; }
             QListWidget::item { border-bottom: 1px solid #2A2A2C; border-radius: 6px; margin-bottom: 2px;}
             QListWidget::item:hover { background: #222222; }
-            QListWidget::item:selected { background: transparent; border: 1px solid #0A84FF; }
+            QListWidget::item:selected { background: transparent; border: 1px solid #F1C40F; } /* Yellow Select Outline */
         """)
         
         self._init_ui()
@@ -147,7 +321,6 @@ class Dashboard(QMainWindow):
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(16, 16, 16, 16)
         
-        # --- 1. The Pill Navigation Bar ---
         nav_container = QFrame()
         nav_container.setStyleSheet("QFrame { background: #2A2A2C; border-radius: 8px; padding: 2px; }")
         nav_layout = QHBoxLayout(nav_container)
@@ -165,7 +338,6 @@ class Dashboard(QMainWindow):
         main_layout.addWidget(nav_container)
         main_layout.addSpacing(10)
         
-        # --- 2. The Stacked Views ---
         self.stack = QStackedWidget()
         main_layout.addWidget(self.stack)
         
@@ -177,12 +349,10 @@ class Dashboard(QMainWindow):
         self.stack.addWidget(self.view_settings)
         self.stack.addWidget(self.view_about)
         
-        # Connect Nav Buttons
         self.btn_nav_notes.clicked.connect(lambda: self._switch_tab(0, self.btn_nav_notes))
         self.btn_nav_settings.clicked.connect(lambda: self._switch_tab(1, self.btn_nav_settings))
         self.btn_nav_about.clicked.connect(lambda: self._switch_tab(2, self.btn_nav_about))
 
-        # Global Status Bar
         self.global_status = QLabel("All notes saved.")
         self.global_status.setStyleSheet("color: #888888; font-size: 11px; padding-top: 8px;")
         main_layout.addWidget(self.global_status)
@@ -206,8 +376,6 @@ class Dashboard(QMainWindow):
         self.btn_nav_settings.setChecked(active_btn == self.btn_nav_settings)
         self.btn_nav_about.setChecked(active_btn == self.btn_nav_about)
 
-    # --- View Builders ---
-
     def _build_notes_view(self) -> QWidget:
         w = QWidget()
         l = QVBoxLayout(w)
@@ -221,9 +389,31 @@ class Dashboard(QMainWindow):
         self.list_notes.itemDoubleClicked.connect(lambda item: self._launch_note_instance(item.data(Qt.ItemDataRole.UserRole)))
         
         btn_row = QHBoxLayout()
-        btn_spawn_new = QPushButton("+ New Note")
+        
+        # ACTION: Proper Native SVG Implementation
+        btn_spawn_new = QPushButton()
         btn_spawn_new.setObjectName("ActionBtn")
+        btn_spawn_new.setFixedWidth(36) 
         btn_spawn_new.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        # Safely resolve the path to the new SVG asset
+        from PyQt6.QtGui import QIcon
+        from pathlib import Path
+        plus_icon_path = Path(__file__).parent.parent / "assets" / "plus.svg"
+        
+        if plus_icon_path.exists():
+            btn_spawn_new.setIcon(QIcon(str(plus_icon_path)))
+            btn_spawn_new.setIconSize(QSize(20, 20)) # Perfect size for the 36px box
+        else:
+            btn_spawn_new.setText("+") # Failsafe just in case the file gets moved
+            
+        btn_spawn_new.setStyleSheet("""
+            QPushButton { 
+                background-color: #F1C40F; 
+                border-radius: 6px; 
+            }
+            QPushButton:hover { background-color: #D4AC0D; }
+        """)
         btn_spawn_new.clicked.connect(self._spawn_empty_note)
         
         self.btn_open_sel = QPushButton("Open")
@@ -235,7 +425,6 @@ class Dashboard(QMainWindow):
         self.btn_del_sel.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_del_sel.clicked.connect(self._delete_marked_notes)
         
-        # Hide dynamic buttons by default
         self.btn_open_sel.hide()
         self.btn_del_sel.hide()
         
@@ -305,33 +494,60 @@ class Dashboard(QMainWindow):
         l.setAlignment(Qt.AlignmentFlag.AlignTop)
         l.setContentsMargins(16, 24, 16, 16)
         
+        # 1. Branding Header
         title = QLabel("Floaties v1.0")
-        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #FFF; text-align: center;")
+        title.setStyleSheet("font-size: 24px; font-weight: bold; color: #FFF;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
+        # 2. Main Description
         desc = QLabel(
             "Floaties is a minimalist, local-first sticky note application designed "
             "for Linux and Windows. It was built to provide a clean, native experience "
-            "without compromising on uncompromising offline security.<br><br>"
-            "Developed independently by a solo Systems Engineer to fill the gap of "
-            "reliable, aesthetic productivity tools in the open-source ecosystem."
+            "without compromising on uncompromising offline security."
         )
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("font-size: 13px; color: #A0A0A0; line-height: 1.5;")
         
+        # 3. THE SECURITY PROMISE (Added here)
+        security_pitch = QLabel(
+            "<i>While most apps store your notes in plain text for anyone to see, Floaties treats your "
+            "thoughts like physical valuables in a private safe. I used professional-grade encryption "
+            "because I believe your personal ideas deserve to stay yours alone and invisible to hackers, "
+            "other softwares, and even the operating system itself.</i>"
+        )
+        security_pitch.setWordWrap(True)
+        security_pitch.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Using the brand Yellow (#F1C40F) to make this promise pop
+        security_pitch.setStyleSheet("""
+            color: #F1C40F; 
+            font-size: 12px; 
+            line-height: 1.4; 
+            margin-top: 10px; 
+            padding: 10px;
+        """)
+        
+        # 4. Support Button
         btn_donate = QPushButton("☕ Support the Developer")
         btn_donate.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_donate.setStyleSheet("""
-            QPushButton { background: #FF5E5B; color: #FFF; font-weight: bold; padding: 12px; font-size: 14px; border-radius: 8px; border: none; }
-            QPushButton:hover { background: #FF453A; }
+            QPushButton { 
+                background: #F1C40F; 
+                color: #1A1A1A; 
+                font-weight: bold; 
+                padding: 12px; 
+                font-size: 14px; 
+                border-radius: 8px; 
+                border: none; 
+            }
+            QPushButton:hover { background: #D4AC0D; }
         """)
-        # UPDATE THIS URL
-        btn_donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/yourusername")))
+        btn_donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://ko-fi.com/therealazil")))
         
         l.addWidget(title)
         l.addSpacing(16)
         l.addWidget(desc)
+        l.addWidget(security_pitch) # Injecting the pitch
         l.addSpacing(32)
         l.addWidget(btn_donate)
         l.addStretch()
@@ -340,7 +556,6 @@ class Dashboard(QMainWindow):
     # --- Interaction Logic ---
 
     def _update_action_buttons_visibility(self) -> None:
-        """Dynamically shows/hides footer tools based on checkbox states."""
         has_checked = len(self._get_marked_notes()) > 0
         self.btn_open_sel.setVisible(has_checked)
         self.btn_del_sel.setVisible(has_checked)
@@ -348,8 +563,6 @@ class Dashboard(QMainWindow):
     def _toggle_security_accordion(self) -> None:
         is_vis = self.sec_container.isVisible()
         self.sec_container.setVisible(not is_vis)
-        
-        # ACTION: Clean up/down arrows and escaped ampersands
         self.btn_toggle_security.setText("Security && Password  ↑" if not is_vis else "Security && Password  ↓")
 
     def _refresh_notes_list(self) -> None:
@@ -406,7 +619,7 @@ class Dashboard(QMainWindow):
                 self._delete_specific_note(note_data)
 
     def _delete_specific_note(self, note_data: dict) -> None:
-        from spawner import ACTIVE_NOTES
+        from ui.spawner import ACTIVE_NOTES
         for active_note in list(ACTIVE_NOTES):
             if active_note.db_id == note_data["id"]:
                 active_note._is_being_deleted = True 
@@ -418,25 +631,53 @@ class Dashboard(QMainWindow):
     def _spawn_empty_note(self) -> None:
         self._launch_note_instance(None)
 
+    # Save Notes: Dashboard Note Spawner Patch
+# Target: ui/dashboard.py -> Dashboard class
+# Action: Resolved SQLite NULL ID crash. Implemented decoupled O(1) theme cycling via event signals.
+
     def _launch_note_instance(self, note_data: dict | None) -> None:
         from main import StickyNote
-        from spawner import ACTIVE_NOTES
+        from ui.spawner import ACTIVE_NOTES
+        from ui.toolbar import PRESET_THEMES, get_wcag_text_color
         
         if note_data:
+            # Focus existing note if already active
             for active_note in ACTIVE_NOTES:
                 if active_note.db_id == note_data["id"]:
                     active_note.raise_()
                     active_note.activateWindow()
                     return
-                    
-        note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=note_data)
+            note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=note_data)
+        else:
+            # 1. Clean Instantiation: Pass None to allow StickyNote to generate a valid DB ID securely
+            note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=None)
+            
+            # 2. O(1) Decoupled Theme Cycling
+            if PRESET_THEMES:
+                theme_count = len(PRESET_THEMES)
+                selected_theme = PRESET_THEMES[len(ACTIVE_NOTES) % theme_count]
+                
+                bg_hex = selected_theme["bg"]
+                border_hex = selected_theme["border"]
+                text_hex = get_wcag_text_color(bg_hex)
+                
+                # Robustness: Emit through the existing event bus to prevent tight coupling and state mutation
+                if hasattr(note, 'toolbar'):
+                    note.toolbar.theme_color_changed.emit(bg_hex, border_hex, text_hex)
+            
+            # 3. Apply mathematical cascading for UI placement
+            if ACTIVE_NOTES:
+                last_note = list(ACTIVE_NOTES)[-1]
+                note.move(last_note.x() + 30, last_note.y() + 30)
+            else:
+                note.move(self.x() + 50, self.y() + 50)
+                
         note.note_saved.connect(self._refresh_notes_list)
         note.note_saved.connect(lambda: self.global_status.setText("All notes saved."))
         
         ACTIVE_NOTES.add(note)
         note.show()
 
-    # --- Cryptographic Key Rotation Protocol ---
     def _execute_key_rotation(self) -> None:
         curr_pwd = self.inp_curr_pwd.text().strip()
         new_pwd = self.inp_new_pwd.text().strip()
@@ -455,11 +696,11 @@ class Dashboard(QMainWindow):
             self._set_sec_err("New passwords do not match.")
             return
             
-        self.lbl_sec_status.setStyleSheet("color: #0A84FF;")
+        self.lbl_sec_status.setStyleSheet("color: #F1C40F;")
         self.lbl_sec_status.setText("Preparing...")
         QApplication.processEvents()
         
-        from spawner import ACTIVE_NOTES
+        from ui.spawner import ACTIVE_NOTES
         notes_to_save = [
             n for n in ACTIVE_NOTES 
             if (hasattr(n, 'save_timer') and n.save_timer.isActive()) 
@@ -518,11 +759,14 @@ class Dashboard(QMainWindow):
             self.inp_conf_pwd.clear()
             self.lbl_sec_status.setText("")
             
-            QMessageBox.information(
-                self, 
-                "Password Updated", 
-                f"Your password has been changed successfully.\n\nYour NEW Recovery Code is:\n{new_rec_key}\n\nPlease save this immediately."
-            )
+            self.inp_curr_pwd.clear()
+            self.inp_new_pwd.clear()
+            self.inp_conf_pwd.clear()
+            self.lbl_sec_status.setText("")
+            
+            # ACTION: Replaced native OS MessageBox with our custom branded dialog
+            success_dialog = PasswordUpdatedDialog(new_rec_key, self)
+            success_dialog.exec()
             
         except Exception as e:
             self._set_sec_err(f"CRITICAL ERROR: {str(e)}")
@@ -532,21 +776,39 @@ class Dashboard(QMainWindow):
         self.lbl_sec_status.setText(msg)
 
     def closeEvent(self, event) -> None:
-        from spawner import ACTIVE_NOTES
+        from ui.spawner import ACTIVE_NOTES
         from PyQt6.QtWidgets import QApplication
         
+        total_active = len(ACTIVE_NOTES)
+
+        # ACTION: Intercept the close request if notes are open
+        if total_active > 0:
+            dialog = ExitConfirmDialog(total_active, self)
+            dialog.exec()
+
+            if dialog.choice == "cancel":
+                event.ignore() # Stop the window from closing
+                return
+            elif dialog.choice == "minimize":
+                event.ignore() # Stop the window from closing
+                self.showMinimized() # Push it to the taskbar instead
+                return
+            elif dialog.choice == "exit":
+                pass # Proceed downward to the save-and-close loop
+
+        # --- The Standard Save & Close Loop ---
         notes_to_save = [
             n for n in ACTIVE_NOTES 
             if (hasattr(n, 'save_timer') and n.save_timer.isActive()) 
             or getattr(n, 'pending_save', False)
             or (n.save_worker is not None and n.save_worker.isRunning())
         ]
-        total = len(notes_to_save)
+        total_to_save = len(notes_to_save)
 
-        if total > 0:
+        if total_to_save > 0:
             for i, note in enumerate(notes_to_save, 1):
-                self.global_status.setStyleSheet("color: #0A84FF; font-size: 11px; padding-top: 8px;")
-                self.global_status.setText(f"Closing... (Saving note {i}/{total})")
+                self.global_status.setStyleSheet("color: #F1C40F; font-size: 11px; padding-top: 8px;")
+                self.global_status.setText(f"Closing... (Saving note {i}/{total_to_save})")
                 QApplication.processEvents()
                 
                 note.force_sync_save_for_shutdown()

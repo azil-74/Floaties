@@ -9,7 +9,7 @@ from PyQt6.QtGui import QTextCharFormat, QFont, QColor, QPainter, QBrush, QTextL
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 
 # Import the standalone guide window
-from guide import InfoDialog
+from ui.guide import InfoDialog
 
 PRESET_THEMES = [
     {"bg": "#FFF2AB", "border": "#D4C37A"}, 

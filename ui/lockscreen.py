@@ -1,12 +1,13 @@
 # Floaties Onboarding & Authentication Flow
-# Action: Stripped security jargon. Applied modern, minimalist UI/UX.
+# Action: Patched QDialog event loop panics (KeyboardInterrupt) and removed late-binding lambdas.
 
 import secrets
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, 
-    QPushButton, QStackedWidget, QWidget, QApplication
+    QPushButton, QStackedWidget, QWidget, QApplication, QFrame
 )
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap
 from database import DatabaseManager
 from security import Vault
 
@@ -22,21 +23,23 @@ class AuthFlowDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setFixedSize(380, 260)
+        self.setFixedSize(380, 320)
         
-        # Clean, modern, soft-dark UI (macOS / Windows 11 native feel)
+        from pathlib import Path
+        self.icon_path = str(Path(__file__).parent.parent / "assets" / "Floaties.png")
+        
         self.setStyleSheet("""
-            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 10px; }
+            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
             QLabel { font-family: 'Segoe UI', system-ui; color: #E0E0E0; }
-            QLineEdit { background: #2A2A2C; color: #FFF; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-family: 'Segoe UI'; font-size: 13px;}
-            QLineEdit:focus { border: 1px solid #0A84FF; }
-            QPushButton { background: #0A84FF; color: #FFF; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-family: 'Segoe UI'; font-size: 13px;}
-            QPushButton:hover { background: #0070E0; }
+            QLineEdit { background: #2A2A2C; color: #FFF; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-size: 13px;}
+            QLineEdit:focus { border: 1px solid #F1C40F; }
+            QPushButton { background: #F1C40F; color: #1A1A1A; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px;}
+            QPushButton:hover { background: #D4AC0D; }
             QPushButton:disabled { background: #3A3A3C; color: #888; }
         """)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(25, 25, 25, 25)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack)
         
@@ -50,37 +53,64 @@ class AuthFlowDialog(QDialog):
         self.stack.addWidget(self.view_reveal)
         self.stack.addWidget(self.view_recovery)
         
-        if self.is_setup:
-            self.stack.setCurrentWidget(self.view_setup)
-        else:
-            self.stack.setCurrentWidget(self.view_login)
+        self.stack.setCurrentWidget(self.view_setup if self.is_setup else self.view_login)
+
+    # --- View Navigation Helpers (Fixes Lambda crash) ---
+    def _nav_to_recovery(self):
+        self.stack.setCurrentWidget(self.view_recovery)
+        
+    def _nav_to_login(self):
+        self.stack.setCurrentWidget(self.view_login)
+
+    def _get_logo_header(self) -> QWidget:
+        header = QWidget()
+        h_layout = QVBoxLayout(header)
+        h_layout.setContentsMargins(0, 0, 0, 10)
+        h_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        logo = QLabel()
+        pixmap = QPixmap(self.icon_path)
+        if not pixmap.isNull():
+            logo.setPixmap(pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        h_layout.addWidget(logo, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        title = QLabel("Floaties")
+        title.setStyleSheet("font-size: 22px; font-weight: bold; color: #FFFFFF; margin-top: 5px;")
+        h_layout.addWidget(title, alignment=Qt.AlignmentFlag.AlignCenter)
+        return header
 
     def _build_setup_view(self) -> QWidget:
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("Welcome to Floaties")
-        title.setStyleSheet("font-size: 18px; font-weight: 600; color: #FFFFFF;")
+        l.addWidget(self._get_logo_header())
         
-        desc = QLabel("Set a password to keep your notes private. This is stored locally and cannot be recovered if lost.")
-        desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 13px; color: #A0A0A0; line-height: 1.4;")
+        # ACTION: Upgraded helper text for new user onboarding
+        desc = QLabel("Create your Master Password.")
+        desc.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        helper_text = QLabel(
+            "This password permanently encrypts Floaties' local database. "
+            "Do not forget it as there is no central server to reset it for you."
+        )
+        helper_text.setWordWrap(True)
+        # Using the brand Yellow to draw the eye to the warning
+        helper_text.setStyleSheet("font-size: 10px; color: #F1C40F; text-align: center; margin-bottom: 5px;")
+        helper_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.inp_setup_pwd = QLineEdit()
         self.inp_setup_pwd.setPlaceholderText("Create a password...")
         self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.inp_setup_pwd.returnPressed.connect(self._process_setup)
         
-        self.btn_setup = QPushButton("Get Started")
-        self.btn_setup.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_setup = QPushButton("Encrypt && Start") # Stronger Call-to-Action
+        self.btn_setup.setAutoDefault(False) 
         self.btn_setup.clicked.connect(self._process_setup)
         
-        l.addWidget(title)
         l.addWidget(desc)
-        l.addStretch()
+        l.addWidget(helper_text)
         l.addWidget(self.inp_setup_pwd)
-        l.addSpacing(4)
         l.addWidget(self.btn_setup)
         return w
 
@@ -89,8 +119,7 @@ class AuthFlowDialog(QDialog):
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("Welcome Back")
-        title.setStyleSheet("font-size: 18px; font-weight: 600; color: #FFFFFF;")
+        l.addWidget(self._get_logo_header())
         
         self.inp_login_pwd = QLineEdit()
         self.inp_login_pwd.setPlaceholderText("Enter password...")
@@ -99,20 +128,17 @@ class AuthFlowDialog(QDialog):
         
         self.lbl_login_err = QLabel("")
         self.lbl_login_err.setStyleSheet("color: #FF453A; font-size: 12px;")
+        self.lbl_login_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.btn_login = QPushButton("Open Notes")
-        self.btn_login.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_login.setAutoDefault(False) # ACTION: Prevent Enter-key hijacking
         self.btn_login.clicked.connect(self._process_login)
         
-        # PYLANCE/PYQT FIX: Make it a class variable and disable Enter-key hijacking
         self.btn_forgot = QPushButton("Use a Recovery Code")
-        self.btn_forgot.setAutoDefault(False) 
-        self.btn_forgot.setStyleSheet("background: transparent; color: #0A84FF; font-weight: normal; font-size: 12px;")
-        self.btn_forgot.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_forgot.clicked.connect(lambda: self.stack.setCurrentWidget(self.view_recovery))
+        self.btn_forgot.setAutoDefault(False)
+        self.btn_forgot.setStyleSheet("background: transparent; color: #0A84FF; font-size: 12px; font-weight: normal;")
+        self.btn_forgot.clicked.connect(self._nav_to_recovery) 
         
-        l.addWidget(title)
-        l.addStretch()
         l.addWidget(self.inp_login_pwd)
         l.addWidget(self.lbl_login_err)
         l.addWidget(self.btn_login)
@@ -124,25 +150,61 @@ class AuthFlowDialog(QDialog):
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("Recovery Code")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 600;")
+        title = QLabel("CRITICAL: Recovery Code")
+        title.setStyleSheet("color: #FF453A; font-size: 16px; font-weight: bold;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        desc = QLabel("Please save this code somewhere safe. It is the only way to restore access if you forget your password.")
+        desc = QLabel(
+            "Please write this down and store it offline. Because Floaties is 100% offline, "
+            "this code is the ONLY way to decrypt your notes if you forget your Master Password."
+        )
         desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 13px; color: #A0A0A0;")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        desc.setStyleSheet("font-size: 12px; color: #E0E0E0;")
+        
+        # --- THE ILLUSION: A container that acts as the "Input Box" ---
+        key_container = QFrame()
+        key_container.setStyleSheet("QFrame { background: #2A2A2C; border: 1px solid #3A3A3C; border-radius: 6px; }")
+        kc_layout = QHBoxLayout(key_container)
+        kc_layout.setContentsMargins(10, 4, 4, 4) # Tight right margin to hug the button
+        kc_layout.setSpacing(8)
         
         self.lbl_reveal_key = QLineEdit()
         self.lbl_reveal_key.setReadOnly(True)
-        self.lbl_reveal_key.setStyleSheet("background: #2A2A2C; color: #32D74B; font-size: 15px; font-weight: bold; text-align: center; border: 1px solid #3A3A3C;")
+        # The actual input is transparent and borderless
+        self.lbl_reveal_key.setStyleSheet("background: transparent; color: #F1C40F; font-size: 15px; font-weight: bold; border: none;")
+        
+        self.btn_copy = QPushButton("COPY")
+        self.btn_copy.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy.setAutoDefault(False)
+        self.btn_copy.setStyleSheet("""
+            QPushButton { 
+                background: #3A3A3C; 
+                color: #A0A0A0; 
+                border: none; 
+                border-radius: 4px; 
+                font-size: 11px; 
+                font-weight: bold; 
+                padding: 6px 12px; 
+            }
+            QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+        """)
+        self.btn_copy.clicked.connect(self._copy_recovery_key)
+        
+        kc_layout.addWidget(self.lbl_reveal_key)
+        kc_layout.addWidget(self.btn_copy)
+        # --------------------------------------------------------------
         
         self.btn_reveal_ack = QPushButton("I've saved this safely")
+        self.btn_reveal_ack.setAutoDefault(False)
         self.btn_reveal_ack.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_reveal_ack.clicked.connect(self.accept)
         
         l.addWidget(title)
+        l.addSpacing(5)
         l.addWidget(desc)
         l.addStretch()
-        l.addWidget(self.lbl_reveal_key)
+        l.addWidget(key_container) # Add the container instead of just the line edit
         l.addSpacing(4)
         l.addWidget(self.btn_reveal_ack)
         return w
@@ -152,8 +214,11 @@ class AuthFlowDialog(QDialog):
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("Account Recovery")
-        title.setStyleSheet("color: #FFFFFF; font-size: 18px; font-weight: 600;")
+        l.addWidget(self._get_logo_header())
+        
+        subtitle = QLabel("Account Recovery")
+        subtitle.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: 600;")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.inp_rec_key = QLineEdit()
         self.inp_rec_key.setPlaceholderText("Enter FL-XXXX-XXXX")
@@ -161,27 +226,29 @@ class AuthFlowDialog(QDialog):
         
         self.lbl_rec_err = QLabel("")
         self.lbl_rec_err.setStyleSheet("color: #FF453A; font-size: 12px;")
+        self.lbl_rec_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         btn_row = QHBoxLayout()
         btn_cancel = QPushButton("Cancel")
+        btn_cancel.setAutoDefault(False)
         btn_cancel.setStyleSheet("background: #3A3A3C; color: #E0E0E0;")
-        btn_cancel.clicked.connect(lambda: self.stack.setCurrentWidget(self.view_login))
+        btn_cancel.clicked.connect(self._nav_to_login)
         
         self.btn_recover = QPushButton("Recover")
+        self.btn_recover.setAutoDefault(False)
         self.btn_recover.clicked.connect(self._process_recovery)
         
         btn_row.addWidget(btn_cancel)
         btn_row.addWidget(self.btn_recover)
         
-        l.addWidget(title)
-        l.addStretch()
+        l.addWidget(subtitle)
+        l.addSpacing(5)
         l.addWidget(self.inp_rec_key)
         l.addWidget(self.lbl_rec_err)
         l.addLayout(btn_row)
         return w
 
     def _generate_recovery_key(self, master_pwd: str) -> str:
-        # Rebranded the key prefix to FL (Floaties)
         raw_key = f"FL-{secrets.token_hex(4).upper()}-{secrets.token_hex(4).upper()}"
         rec_salt = Vault.generate_salt()
         encrypted_pwd = Vault.encrypt(master_pwd, raw_key, rec_salt)
@@ -194,9 +261,11 @@ class AuthFlowDialog(QDialog):
         if len(pwd) < 4:
             return 
             
+        self.setFocus() # ACTION: Safely shift focus away from input
         self.btn_setup.setEnabled(False)
         self.inp_setup_pwd.setEnabled(False)
         self.btn_setup.setText("Preparing...")
+        QApplication.processEvents()
         QTimer.singleShot(50, lambda: self._execute_setup_crypto(pwd))
 
     def _execute_setup_crypto(self, pwd: str) -> None:
@@ -215,13 +284,15 @@ class AuthFlowDialog(QDialog):
         pwd = self.inp_login_pwd.text().strip()
         if not pwd: return
         
+        self.setFocus() # ACTION: Safely shift focus away from input
         self.btn_login.setEnabled(False)
         self.inp_login_pwd.setEnabled(False)
-        self.btn_forgot.setEnabled(False) # ACTION: Lock this button too!
+        self.btn_forgot.setEnabled(False) 
         
-        self.lbl_login_err.setStyleSheet("color: #0A84FF;")
+        self.lbl_login_err.setStyleSheet("color: #F1C40F;")
         self.lbl_login_err.setText("Loading...")
-        QTimer.singleShot(50, lambda: self._execute_login_crypto(pwd))
+        QApplication.processEvents()
+        QTimer.singleShot(100, lambda: self._execute_login_crypto(pwd))
 
     def _execute_login_crypto(self, pwd: str) -> None:
         token = self.db.get_meta("val_token")
@@ -251,7 +322,7 @@ class AuthFlowDialog(QDialog):
         
         self.inp_login_pwd.setEnabled(True)
         self.btn_login.setEnabled(True)
-        self.btn_forgot.setEnabled(True) # ACTION: Unlock the button
+        self.btn_forgot.setEnabled(True) 
         
         self.inp_login_pwd.setFocus()
 
@@ -259,8 +330,9 @@ class AuthFlowDialog(QDialog):
         rec_key = self.inp_rec_key.text().strip().upper()
         if not rec_key: return
         
+        self.setFocus() # ACTION: Safely shift focus away from input
         self.btn_recover.setEnabled(False)
-        self.lbl_rec_err.setStyleSheet("color: #0A84FF;")
+        self.lbl_rec_err.setStyleSheet("color: #F1C40F;")
         self.lbl_rec_err.setText("Verifying...")
         QApplication.processEvents()
         
@@ -291,3 +363,45 @@ class AuthFlowDialog(QDialog):
         self.inp_rec_key.clear()
         self.btn_recover.setEnabled(True)
         self.inp_rec_key.setFocus()
+    
+    def _copy_recovery_key(self) -> None:
+        # Access the OS clipboard and inject the key
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(self.lbl_reveal_key.text())
+            
+            # Visual feedback: Flash the brand yellow
+            self.btn_copy.setText("COPIED!")
+            self.btn_copy.setStyleSheet("""
+                QPushButton { 
+                    background: #F1C40F; 
+                    color: #1A1A1A; 
+                    border: none; 
+                    border-radius: 4px; 
+                    font-size: 11px; 
+                    font-weight: bold; 
+                    padding: 6px 12px; 
+                }
+            """)
+            # Reset back to normal after 2 seconds
+            QTimer.singleShot(2000, self._reset_copy_btn)
+
+    def _reset_copy_btn(self) -> None:
+        try:
+            # Check if the C++ object still exists before modifying it
+            self.btn_copy.setText("COPY")
+            self.btn_copy.setStyleSheet("""
+                QPushButton { 
+                    background: #3A3A3C; 
+                    color: #A0A0A0; 
+                    border: none; 
+                    border-radius: 4px; 
+                    font-size: 11px; 
+                    font-weight: bold; 
+                    padding: 6px 12px; 
+                }
+                QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+            """)
+        except RuntimeError:
+            # The window was closed before the 2 seconds finished. Safely ignore!
+            pass
