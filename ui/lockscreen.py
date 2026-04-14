@@ -97,22 +97,71 @@ class AuthFlowDialog(QDialog):
         )
         helper_text.setWordWrap(True)
         # Using the brand Yellow to draw the eye to the warning
-        helper_text.setStyleSheet("font-size: 10px; color: #F1C40F; text-align: center; margin-bottom: 5px;")
+        helper_text.setStyleSheet("font-size: 11px; color: #FAF9F6; text-align: center; margin-bottom: 5px;")
         helper_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.inp_setup_pwd = QLineEdit()
         self.inp_setup_pwd.setPlaceholderText("Create a password...")
         self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         
-        self.btn_setup = QPushButton("Encrypt && Start") # Stronger Call-to-Action
+        self.btn_setup = QPushButton("Encrypt & Start")
         self.btn_setup.setAutoDefault(False) 
         self.btn_setup.clicked.connect(self._process_setup)
+
+        # --- NEW: Restore Button ---
+        self.btn_restore = QPushButton("Restore from Backup (.vault)")
+        self.btn_restore.setAutoDefault(False)
+        self.btn_restore.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_restore.setStyleSheet("background: transparent; color: #F1C40F; font-size: 12px; font-weight: normal; border: 1px solid #3A3A3C;")
+        self.btn_restore.clicked.connect(self._import_vault)
         
         l.addWidget(desc)
         l.addWidget(helper_text)
         l.addWidget(self.inp_setup_pwd)
         l.addWidget(self.btn_setup)
+        l.addSpacing(10)
+        l.addWidget(self.btn_restore) # Add to layout
         return w
+    
+    def _import_vault(self) -> None:
+        import shutil
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        # ACTION: Added DontUseNativeDialog to prevent event-loop hijacking and VS Code crashes
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 
+            "Select Vault Backup", 
+            "", 
+            "Floaties Vault (*.vault *.db);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+        
+        if file_path:
+            try:
+                # Overwrite the empty local database with the imported backup
+                shutil.copy2(file_path, self.db.db_path)
+                
+                # Reload the database connection and fetch the imported metadata
+                self.db._init_db() 
+                self.salt = self.db.get_meta("salt")
+                
+                # Verify that it's a valid Floaties DB by checking for the salt
+                if self.salt:
+                    self.is_setup = False
+                    self.inp_setup_pwd.clear()
+                    
+                    # Dynamically switch the UI to the Login screen
+                    self.stack.setCurrentWidget(self.view_login)
+                    
+                    QMessageBox.information(
+                        self, "Import Successful", 
+                        "Vault imported successfully. Please log in with your existing Master Password."
+                    )
+                else:
+                    raise ValueError("The selected file is not a valid Floaties vault.")
+                    
+            except Exception as e:
+                QMessageBox.critical(self, "Import Failed", f"Could not restore vault: {e}")
 
     def _build_login_view(self) -> QWidget:
         w = QWidget()

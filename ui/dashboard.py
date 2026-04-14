@@ -482,11 +482,65 @@ class Dashboard(QMainWindow):
         sec_layout.addWidget(btn_change_pwd)
         
         self.btn_toggle_security.clicked.connect(self._toggle_security_accordion)
+
+        # --- Export Vault Section ---
+        export_container = QWidget()
+        export_layout = QVBoxLayout(export_container)
+        export_layout.setContentsMargins(16, 16, 16, 0)
+
+        lbl_export = QLabel("Backup & Restore")
+        lbl_export.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: 600;")
         
+        desc_export = QLabel(
+            "Export an encrypted copy of your entire vault. "
+            "You can restore this file on a new device using your current Master Password."
+        )
+        desc_export.setWordWrap(True)
+        desc_export.setStyleSheet("font-size: 12px; color: #888888; margin-bottom: 5px;")
+
+        btn_export = QPushButton("Export Secure Vault")
+        btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export.setStyleSheet("""
+            QPushButton { background: #3A3A3C; color: #E0E0E0; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { background: #4A4A4C; color: #FFF; }
+        """)
+        btn_export.clicked.connect(self._export_vault)
+
+        export_layout.addWidget(lbl_export)
+        export_layout.addWidget(desc_export)
+        export_layout.addWidget(btn_export)
+
         l.addWidget(self.btn_toggle_security)
         l.addWidget(self.sec_container)
+        l.addWidget(export_container) # Add the new container to the main layout
         l.addStretch()
         return w
+    
+    def _export_vault(self) -> None:
+        import shutil
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        from datetime import datetime
+
+        # Suggest a filename with today's date
+        date_str = datetime.now().strftime("%Y-%m-%d")
+        suggested_name = f"Floaties_Backup_{date_str}.vault"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Encrypted Vault", suggested_name, "Floaties Vault (*.vault);;All Files (*)"
+        )
+        
+        if file_path:
+            try:
+                # ACTION: Removed the encapsulation-breaking db.conn call.
+                # Relying entirely on DatabaseManager's atomic writes.
+                shutil.copy2(self.db.db_path, file_path)
+                
+                QMessageBox.information(
+                    self, "Export Successful", 
+                    "Your encrypted vault has been securely backed up.\n\nKeep this file safe!"
+                )
+            except Exception as e:
+                QMessageBox.critical(self, "Export Failed", f"Could not create backup: {e}")
 
     def _build_about_view(self) -> QWidget:
         w = QWidget()
