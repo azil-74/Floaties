@@ -1,6 +1,6 @@
 # Floaties 📝
 
-Floaties is a secure, minimalist sticky note application built for Linux and Windows. It focuses on privacy, local-first data ownership, and a distraction-free user experience.
+Floaties is a secure, minimalist sticky note application built for Linux and Windows (coming soon to store). It focuses on privacy, local-first data ownership, and a distraction-free user experience.
 
 ## ✨ Key Features
 * **Encryption by Default**: Uses Argon2id and AES-256 (via Fernet) to secure your notes in a local vault.
