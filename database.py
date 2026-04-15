@@ -24,7 +24,7 @@ def _resolve_secure_db_path() -> Path:
     storage_dir.mkdir(parents=True, exist_ok=True)
     return storage_dir / "floatslate.db"
 
-DB_PATH = Path(__file__).parent / "floatslate.db"
+DB_PATH = _resolve_secure_db_path()
 
 class DatabaseManager:
     """Handles thread-safe SQLite operations with strict atomic transaction boundaries."""
