@@ -86,15 +86,23 @@ class DatabaseManager:
 
     def cleanup_old_logs(self, days: int = 30) -> None:
         """Purges crash logs older than the specified number of days."""
+        import sqlite3
         try:
+            # 1. Perform the deletion within a safe transaction
             with self.transaction() as cur:
                 cur.execute(
                     "DELETE FROM crash_logs WHERE timestamp < datetime('now', ?)", 
                     (f'-{days} days',)
                 )
-                # Recover unused space after deletion
-                cur.execute("VACUUM;")
+            
+            # 2. VACUUM must happen OUTSIDE of an active transaction block
+            # We open a temporary raw connection just for this optimization
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("VACUUM;")
+            conn.close()
+            
         except Exception as e:
+            # This ensures background errors never interrupt the user's workflow
             print(f"Background maintenance failed: {e}")
     
     def export_crash_logs(self, file_path: str) -> bool:

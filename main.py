@@ -388,7 +388,15 @@ def main() -> None:
     # --------------------------------------
     
     db = DatabaseManager()
-    
+
+    # --- First-Time Onboarding Walkthrough ---
+    # Only triggers if the vault has never been set up
+    if db.get_meta("salt") is None:
+        from ui.onboarding import OnboardingDialog
+        intro = OnboardingDialog()
+        if intro.exec() != QDialog.DialogCode.Accepted:
+            sys.exit(0) # User exited the intro
+            
     lock = AuthFlowDialog(db)
     if lock.exec() != QDialog.DialogCode.Accepted:
         sys.exit(0)
@@ -408,5 +416,22 @@ def main() -> None:
             
     sys.exit(app.exec())
 
+def run_background_maintenance():
+    """Independent thread for DB optimization and log purging."""
+    import time
+    from database import DatabaseManager
+    # Wait for the system to settle before running cleanup
+    time.sleep(5) 
+    try:
+        db = DatabaseManager()
+        db.cleanup_old_logs(days=30)
+        print("⚡ [Maintenance] 30-day crash log cleanup completed.")
+    except Exception as e:
+        print(f"Maintenance Thread Error: {e}")
+
 if __name__ == "__main__":
+    import threading
+    # Launch maintenance as a daemon so it doesn't block app exit
+    threading.Thread(target=run_background_maintenance, daemon=True).start()
+    
     main()

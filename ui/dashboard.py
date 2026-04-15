@@ -624,7 +624,8 @@ class Dashboard(QMainWindow):
         l.setContentsMargins(16, 24, 16, 16)
         
         # 1. Branding Header
-        title = QLabel("Floaties v1.0")
+        # Action: Used rich HTML to specifically target the v1.0 sizing and color
+        title = QLabel("Floaties <span style='font-size: 14px; color: #888888; font-weight: normal;'>v1.0</span>")
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #FFF;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
@@ -638,7 +639,7 @@ class Dashboard(QMainWindow):
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("font-size: 13px; color: #A0A0A0; line-height: 1.5;")
         
-        # 3. THE SECURITY PROMISE (Added here)
+        # 3. THE SECURITY PROMISE
         security_pitch = QLabel(
             "<i>While most apps store your notes in plain text for anyone to see, Floaties treats your "
             "thoughts like physical valuables in a private safe. I used professional-grade encryption "
@@ -647,7 +648,6 @@ class Dashboard(QMainWindow):
         )
         security_pitch.setWordWrap(True)
         security_pitch.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # Using the brand Yellow (#F1C40F) to make this promise pop
         security_pitch.setStyleSheet("""
             color: #F1C40F; 
             font-size: 12px; 
@@ -659,27 +659,76 @@ class Dashboard(QMainWindow):
         # 4. Support Button
         btn_donate = QPushButton("☕ Support the Developer")
         btn_donate.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Action: Applied an analogous Blue-to-Cyan gradient for better color harmony
         btn_donate.setStyleSheet("""
             QPushButton { 
-                background: #F1C40F; 
-                color: #1A1A1A; 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #06B6D4); 
+                color: #FFFFFF; 
                 font-weight: bold; 
                 padding: 12px; 
                 font-size: 14px; 
                 border-radius: 8px; 
                 border: none; 
             }
-            QPushButton:hover { background: #D4AC0D; }
+            QPushButton:hover { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #0891B2); 
+            }
         """)
-        # ACTION: Removed the lambda to prevent silent C++ crashes on Wayland/Linux
         btn_donate.clicked.connect(self._open_support_link)
+        
+        # Action: Temporarily hidden for v1.0 release while gateways are researched.
+        # Simply delete this line to re-enable the button in a future update.
+        btn_donate.hide()
+
+        # 5. Email & Bug Reports
+        feedback_title = QLabel("Found a bug or have a suggestion?")
+        feedback_title.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: bold; margin-top: 16px;")
+        feedback_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        feedback_desc = QLabel(
+            "Please export your Crash Logs from the Settings tab "
+            "and attach them to your email to help me debug faster!"
+        )
+        feedback_desc.setWordWrap(True)
+        feedback_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        feedback_desc.setStyleSheet("font-size: 12px; color: #A0A0A0; margin-bottom: 8px;")
+
+        # Container matching the Recovery Key aesthetic
+        email_container = QFrame()
+        email_container.setStyleSheet("QFrame { background: #2A2A2C; border: 1px solid #3A3A3C; border-radius: 6px; }")
+        ec_layout = QHBoxLayout(email_container)
+        ec_layout.setContentsMargins(10, 4, 4, 4)
+        ec_layout.setSpacing(8)
+
+        self.lbl_email = QLineEdit("azil@tute.io")
+        self.lbl_email.setReadOnly(True)
+        # Action: Unified color with the Support Button's cyan gradient stop (#06B6D4)
+        self.lbl_email.setStyleSheet("background: transparent; color: #06B6D4; font-size: 13px; font-weight: bold; border: none;")
+
+        self.btn_copy_email = QPushButton("COPY")
+        self.btn_copy_email.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_copy_email.setAutoDefault(False)
+        self.btn_copy_email.setStyleSheet("""
+            QPushButton { 
+                background: #3A3A3C; color: #A0A0A0; border: none; 
+                border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+            }
+            QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+        """)
+        self.btn_copy_email.clicked.connect(self._copy_support_email)
+
+        ec_layout.addWidget(self.lbl_email)
+        ec_layout.addWidget(self.btn_copy_email)
         
         l.addWidget(title)
         l.addSpacing(16)
         l.addWidget(desc)
-        l.addWidget(security_pitch) # Injecting the pitch
-        l.addSpacing(32)
+        l.addWidget(security_pitch)
+        l.addSpacing(24)
         l.addWidget(btn_donate)
+        l.addWidget(feedback_title)
+        l.addWidget(feedback_desc)
+        l.addWidget(email_container)
         l.addStretch()
         return w
     
@@ -697,6 +746,36 @@ class Dashboard(QMainWindow):
         except Exception as e:
             # If Wayland/Windows fails to find a browser, we catch it gracefully instead of crashing
             print(f"🚨 Browser routing failed: {e}")
+
+    def _copy_support_email(self) -> None:
+        """Copies the support email to clipboard and flashes the button cyan."""
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QTimer
+        
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText("azil@tute.io")
+            self.btn_copy_email.setText("COPIED!")
+            self.btn_copy_email.setStyleSheet("""
+                QPushButton { 
+                    background: #06B6D4; color: #1A1A1A; border: none; 
+                    border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+                }
+            """)
+            QTimer.singleShot(2000, self._reset_email_copy_btn)
+
+    def _reset_email_copy_btn(self) -> None:
+        try:
+            self.btn_copy_email.setText("COPY")
+            self.btn_copy_email.setStyleSheet("""
+                QPushButton { 
+                    background: #3A3A3C; color: #A0A0A0; border: none; 
+                    border-radius: 4px; font-size: 11px; font-weight: bold; padding: 6px 12px; 
+                }
+                QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
+            """)
+        except RuntimeError:
+            pass
 
     # --- Interaction Logic ---
 

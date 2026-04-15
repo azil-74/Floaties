@@ -23,7 +23,8 @@ class AuthFlowDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setFixedSize(380, 320)
+        # Action: Expanded height to 420px to comfortably fit the new fields and spacing
+        self.setFixedSize(380, 420)
         
         from pathlib import Path
         self.icon_path = str(Path(__file__).parent.parent / "assets" / "Floaties.png")
@@ -83,10 +84,10 @@ class AuthFlowDialog(QDialog):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(12) # Add consistent breathing room between all elements
         
         l.addWidget(self._get_logo_header())
         
-        # ACTION: Upgraded helper text for new user onboarding
         desc = QLabel("Create your Master Password.")
         desc.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -96,19 +97,51 @@ class AuthFlowDialog(QDialog):
             "Do not forget it as there is no central server to reset it for you."
         )
         helper_text.setWordWrap(True)
-        # Using the brand Yellow to draw the eye to the warning
         helper_text.setStyleSheet("font-size: 11px; color: #FAF9F6; text-align: center; margin-bottom: 5px;")
         helper_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
+        from ui.utils import load_colored_svg
+        self.icon_eye = load_colored_svg("eye.svg", "#888888")
+        self.icon_eye_off = load_colored_svg("eye-off.svg", "#888888")
+
+        from PyQt6.QtGui import QAction
+
+        # --- Primary Password Field ---
         self.inp_setup_pwd = QLineEdit()
         self.inp_setup_pwd.setPlaceholderText("Create a password...")
         self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self.inp_setup_pwd.setAccessibleName("New Password") # Accessibility flag for Password Managers
         
+        # Action: Explicitly instantiate QAction with parent, then set icon to satisfy strict typing
+        self.action_eye_pwd = QAction(self.inp_setup_pwd)
+        self.action_eye_pwd.setIcon(self.icon_eye)
+        self.inp_setup_pwd.addAction(self.action_eye_pwd, QLineEdit.ActionPosition.TrailingPosition)
+        self.action_eye_pwd.triggered.connect(self._toggle_pwd_vis)
+        
+        # --- Confirm Password Field ---
+        self.inp_setup_conf_pwd = QLineEdit()
+        self.inp_setup_conf_pwd.setPlaceholderText("Confirm password...")
+        self.inp_setup_conf_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self.inp_setup_conf_pwd.setAccessibleName("Confirm Password") # Accessibility flag
+        
+        self.action_eye_conf = QAction(self.inp_setup_conf_pwd)
+        self.action_eye_conf.setIcon(self.icon_eye)
+        self.inp_setup_conf_pwd.addAction(self.action_eye_conf, QLineEdit.ActionPosition.TrailingPosition)
+        self.action_eye_conf.triggered.connect(self._toggle_conf_vis)
+
+        # Validation Label & Hooks
+        self.lbl_setup_err = QLabel("")
+        self.lbl_setup_err.setStyleSheet("color: #FF453A; font-size: 11px;")
+        self.lbl_setup_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.inp_setup_pwd.textChanged.connect(self._validate_setup_passwords)
+        self.inp_setup_conf_pwd.textChanged.connect(self._validate_setup_passwords)
+
         self.btn_setup = QPushButton("Encrypt & Start")
         self.btn_setup.setAutoDefault(False) 
+        self.btn_setup.setEnabled(False) # Locked until passwords match
         self.btn_setup.clicked.connect(self._process_setup)
 
-        # --- NEW: Restore Button ---
         self.btn_restore = QPushButton("Restore from Backup (.vault)")
         self.btn_restore.setAutoDefault(False)
         self.btn_restore.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -118,11 +151,59 @@ class AuthFlowDialog(QDialog):
         l.addWidget(desc)
         l.addWidget(helper_text)
         l.addWidget(self.inp_setup_pwd)
+        l.addWidget(self.inp_setup_conf_pwd)
+        l.addWidget(self.lbl_setup_err)
         l.addWidget(self.btn_setup)
-        l.addSpacing(10)
-        l.addWidget(self.btn_restore) # Add to layout
+        l.addWidget(self.btn_restore)
+        l.addStretch()
         return w
     
+    def _toggle_login_vis(self) -> None:
+        if self.inp_login_pwd.echoMode() == QLineEdit.EchoMode.Password:
+            self.inp_login_pwd.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.action_eye_login.setIcon(self.icon_eye_off)
+        else:
+            self.inp_login_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+            self.action_eye_login.setIcon(self.icon_eye)
+
+    def _toggle_pwd_vis(self) -> None:
+        if self.inp_setup_pwd.echoMode() == QLineEdit.EchoMode.Password:
+            self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.action_eye_pwd.setIcon(self.icon_eye_off)
+        else:
+            self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+            self.action_eye_pwd.setIcon(self.icon_eye)
+
+    def _toggle_conf_vis(self) -> None:
+        if self.inp_setup_conf_pwd.echoMode() == QLineEdit.EchoMode.Password:
+            self.inp_setup_conf_pwd.setEchoMode(QLineEdit.EchoMode.Normal)
+            self.action_eye_conf.setIcon(self.icon_eye_off)
+        else:
+            self.inp_setup_conf_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+            self.action_eye_conf.setIcon(self.icon_eye)
+
+    def _validate_setup_passwords(self) -> None:
+        pwd = self.inp_setup_pwd.text()
+        conf = self.inp_setup_conf_pwd.text()
+        
+        if not pwd and not conf:
+            self.lbl_setup_err.setText("")
+            self.btn_setup.setEnabled(False)
+            return
+
+        if len(pwd) < 4:
+            self.lbl_setup_err.setStyleSheet("color: #FF453A;")
+            self.lbl_setup_err.setText("Password must be at least 4 characters.")
+            self.btn_setup.setEnabled(False)
+        elif pwd != conf:
+            self.lbl_setup_err.setStyleSheet("color: #FF453A;")
+            self.lbl_setup_err.setText("Passwords do not match.")
+            self.btn_setup.setEnabled(False)
+        else:
+            self.lbl_setup_err.setStyleSheet("color: #4EC9B0;")
+            self.lbl_setup_err.setText("Passwords match.")
+            self.btn_setup.setEnabled(True)
+
     def _import_vault(self) -> None:
         import shutil
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
@@ -167,31 +248,59 @@ class AuthFlowDialog(QDialog):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(12) 
+        
+        # 1. Fixed top breathing room so the flat-topped logo never looks clipped
+        l.addSpacing(20) 
         
         l.addWidget(self._get_logo_header())
         
+        # 2. The Shock Absorber: Pushes the logo up, and the fields down
+        l.addStretch() 
+        
+        desc = QLabel("Unlock your vault")
+        desc.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
+        desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
         self.inp_login_pwd = QLineEdit()
-        self.inp_login_pwd.setPlaceholderText("Enter password...")
+        self.inp_login_pwd.setPlaceholderText("Enter Master Password...")
         self.inp_login_pwd.setEchoMode(QLineEdit.EchoMode.Password)
         self.inp_login_pwd.returnPressed.connect(self._process_login)
+        
+        from PyQt6.QtGui import QAction
+        from ui.utils import load_colored_svg
+        
+        if not hasattr(self, 'icon_eye'):
+            self.icon_eye = load_colored_svg("eye.svg", "#888888")
+            self.icon_eye_off = load_colored_svg("eye-off.svg", "#888888")
+            
+        self.action_eye_login = QAction(self.inp_login_pwd)
+        self.action_eye_login.setIcon(self.icon_eye)
+        self.inp_login_pwd.addAction(self.action_eye_login, QLineEdit.ActionPosition.TrailingPosition)
+        self.action_eye_login.triggered.connect(self._toggle_login_vis)
         
         self.lbl_login_err = QLabel("")
         self.lbl_login_err.setStyleSheet("color: #FF453A; font-size: 12px;")
         self.lbl_login_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.btn_login = QPushButton("Open Notes")
-        self.btn_login.setAutoDefault(False) # ACTION: Prevent Enter-key hijacking
+        self.btn_login.setAutoDefault(False) 
         self.btn_login.clicked.connect(self._process_login)
         
         self.btn_forgot = QPushButton("Use a Recovery Code")
         self.btn_forgot.setAutoDefault(False)
-        self.btn_forgot.setStyleSheet("background: transparent; color: #0A84FF; font-size: 12px; font-weight: normal;")
+        self.btn_forgot.setStyleSheet("background: transparent; color: #06B6D4; font-size: 12px; font-weight: normal;")
         self.btn_forgot.clicked.connect(self._nav_to_recovery) 
         
+        # Stack the bottom elements
+        l.addWidget(desc)
         l.addWidget(self.inp_login_pwd)
         l.addWidget(self.lbl_login_err)
         l.addWidget(self.btn_login)
         l.addWidget(self.btn_forgot)
+        
+        # 3. Fixed bottom margin so the buttons don't touch the window edge
+        l.addSpacing(10) 
         return w
 
     def _build_reveal_view(self) -> QWidget:
@@ -262,11 +371,18 @@ class AuthFlowDialog(QDialog):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
+        l.setSpacing(12) 
+        
+        # 1. Identical top margin
+        l.addSpacing(20) 
         
         l.addWidget(self._get_logo_header())
         
+        # 2. Identical Shock Absorber
+        l.addStretch() 
+        
         subtitle = QLabel("Account Recovery")
-        subtitle.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: 600;")
+        subtitle.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         self.inp_rec_key = QLineEdit()
@@ -278,9 +394,11 @@ class AuthFlowDialog(QDialog):
         self.lbl_rec_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+        
         btn_cancel = QPushButton("Cancel")
         btn_cancel.setAutoDefault(False)
-        btn_cancel.setStyleSheet("background: #3A3A3C; color: #E0E0E0;")
+        btn_cancel.setStyleSheet("background: transparent; color: #A0A0A0; font-weight: normal; border: 1px solid #3A3A3C;")
         btn_cancel.clicked.connect(self._nav_to_login)
         
         self.btn_recover = QPushButton("Recover")
@@ -290,11 +408,14 @@ class AuthFlowDialog(QDialog):
         btn_row.addWidget(btn_cancel)
         btn_row.addWidget(self.btn_recover)
         
+        # Stack the bottom elements
         l.addWidget(subtitle)
-        l.addSpacing(5)
         l.addWidget(self.inp_rec_key)
         l.addWidget(self.lbl_rec_err)
         l.addLayout(btn_row)
+        
+        # 3. Identical bottom margin
+        l.addSpacing(10) 
         return w
 
     def _generate_recovery_key(self, master_pwd: str) -> str:
@@ -313,6 +434,7 @@ class AuthFlowDialog(QDialog):
         self.setFocus() # ACTION: Safely shift focus away from input
         self.btn_setup.setEnabled(False)
         self.inp_setup_pwd.setEnabled(False)
+        self.inp_setup_conf_pwd.setEnabled(False)
         self.btn_setup.setText("Preparing...")
         
         # ACTION: Removed processEvents() to stop VS Code debugger panics.
