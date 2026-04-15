@@ -8,12 +8,11 @@ def load_colored_svg(filename: str, color_hex: str):
     
     filepath = Path(__file__).parent.parent / "assets" / filename
     if not filepath.exists():
-        return QIcon() # Safe fallback
+        return QIcon()
         
     with open(filepath, 'r', encoding='utf-8') as f:
         svg_data = f.read()
-        
-    # Dynamically inject the WCAG contrast color!
+
     svg_data = svg_data.replace("#TEXT_COLOR#", color_hex)
     
     arr = QByteArray(svg_data.encode('utf-8'))

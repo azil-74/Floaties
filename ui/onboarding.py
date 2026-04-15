@@ -1,6 +1,3 @@
-# Floaties Onboarding Experience
-# Action: Implemented a professional, slide-based intro to justify the "Security-First" architecture.
-
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QStackedWidget, QWidget, QFrame
@@ -30,28 +27,23 @@ class OnboardingDialog(QDialog):
         
         layout = QVBoxLayout(self)
         self.stack = QStackedWidget()
-        
-        # Build Slides
         self.stack.addWidget(self._slide_welcome())
         self.stack.addWidget(self._slide_security())
         self.stack.addWidget(self._slide_privacy())
         
         layout.addWidget(self.stack)
-        
-        # Navigation Row
+    
         nav_layout = QHBoxLayout()
         
         self.btn_back = QPushButton("← Back")
         self.btn_back.setObjectName("BackButton")
         self.btn_back.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_back.clicked.connect(self._handle_back)
-        self.btn_back.hide() # Hidden on the first slide
-        
+        self.btn_back.hide()
         self.btn_next = QPushButton("Next →")
         self.btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_next.clicked.connect(self._handle_next)
-        
-        # Action: Squeeze the buttons between two stretches to perfectly center them
+
         nav_layout.addStretch()
         nav_layout.addWidget(self.btn_back)
         nav_layout.addSpacing(10)
@@ -65,7 +57,6 @@ class OnboardingDialog(QDialog):
         l = QVBoxLayout(w)
         l.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Logo placeholder
         from pathlib import Path
         logo_path = str(Path(__file__).parent.parent / "assets" / "Floaties.png")
         logo = QLabel()
@@ -92,17 +83,15 @@ class OnboardingDialog(QDialog):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Action: Create a horizontal layout to hold the title and the SVG side-by-side
+
         title_layout = QHBoxLayout()
         title_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
         title = QLabel("Give your ideas a private sky.")
         title.setStyleSheet("font-size: 22px; font-weight: bold; color: #F1C40F;")
         
         icon = QLabel()
         from ui.utils import load_colored_svg
-        # Scaled down to 24x24 to perfectly match the height of the 22px font
+
         icon.setPixmap(load_colored_svg("lock.svg", "#F1C40F").pixmap(24, 24)) 
         
         title_layout.addWidget(title)

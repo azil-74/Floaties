@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Floaties
+Comment=Secure and minimalist sticky notes
+Exec=floaties
+Icon=${SNAP}/meta/gui/floaties.png
+Terminal=false
+Type=Application
+Categories=Utility;Office;
+StartupNotify=true
+StartupWMClass=floaties.app.core.1

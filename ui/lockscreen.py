@@ -1,6 +1,3 @@
-# Floaties Onboarding & Authentication Flow
-# Action: Patched QDialog event loop panics (KeyboardInterrupt) and removed late-binding lambdas.
-
 import secrets
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, QLabel, 
@@ -23,7 +20,6 @@ class AuthFlowDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        # Action: Expanded height to 420px to comfortably fit the new fields and spacing
         self.setFixedSize(380, 420)
         
         from pathlib import Path
@@ -84,7 +80,7 @@ class AuthFlowDialog(QDialog):
         w = QWidget()
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
-        l.setSpacing(12) # Add consistent breathing room between all elements
+        l.setSpacing(12)
         
         l.addWidget(self._get_logo_header())
         
@@ -106,30 +102,26 @@ class AuthFlowDialog(QDialog):
 
         from PyQt6.QtGui import QAction
 
-        # --- Primary Password Field ---
         self.inp_setup_pwd = QLineEdit()
         self.inp_setup_pwd.setPlaceholderText("Create a password...")
         self.inp_setup_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.inp_setup_pwd.setAccessibleName("New Password") # Accessibility flag for Password Managers
+        self.inp_setup_pwd.setAccessibleName("New Password")
         
-        # Action: Explicitly instantiate QAction with parent, then set icon to satisfy strict typing
         self.action_eye_pwd = QAction(self.inp_setup_pwd)
         self.action_eye_pwd.setIcon(self.icon_eye)
         self.inp_setup_pwd.addAction(self.action_eye_pwd, QLineEdit.ActionPosition.TrailingPosition)
         self.action_eye_pwd.triggered.connect(self._toggle_pwd_vis)
         
-        # --- Confirm Password Field ---
         self.inp_setup_conf_pwd = QLineEdit()
         self.inp_setup_conf_pwd.setPlaceholderText("Confirm password...")
         self.inp_setup_conf_pwd.setEchoMode(QLineEdit.EchoMode.Password)
-        self.inp_setup_conf_pwd.setAccessibleName("Confirm Password") # Accessibility flag
+        self.inp_setup_conf_pwd.setAccessibleName("Confirm Password")
         
         self.action_eye_conf = QAction(self.inp_setup_conf_pwd)
         self.action_eye_conf.setIcon(self.icon_eye)
         self.inp_setup_conf_pwd.addAction(self.action_eye_conf, QLineEdit.ActionPosition.TrailingPosition)
         self.action_eye_conf.triggered.connect(self._toggle_conf_vis)
 
-        # Validation Label & Hooks
         self.lbl_setup_err = QLabel("")
         self.lbl_setup_err.setStyleSheet("color: #FF453A; font-size: 11px;")
         self.lbl_setup_err.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -139,7 +131,7 @@ class AuthFlowDialog(QDialog):
 
         self.btn_setup = QPushButton("Encrypt & Start")
         self.btn_setup.setAutoDefault(False) 
-        self.btn_setup.setEnabled(False) # Locked until passwords match
+        self.btn_setup.setEnabled(False)
         self.btn_setup.clicked.connect(self._process_setup)
 
         self.btn_restore = QPushButton("Restore from Backup (.vault)")
@@ -208,7 +200,6 @@ class AuthFlowDialog(QDialog):
         import shutil
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
 
-        # ACTION: Added DontUseNativeDialog to prevent event-loop hijacking and VS Code crashes
         file_path, _ = QFileDialog.getOpenFileName(
             self, 
             "Select Vault Backup", 
@@ -219,19 +210,16 @@ class AuthFlowDialog(QDialog):
         
         if file_path:
             try:
-                # Overwrite the empty local database with the imported backup
+        
                 shutil.copy2(file_path, self.db.db_path)
                 
-                # Reload the database connection and fetch the imported metadata
                 self.db._init_db() 
                 self.salt = self.db.get_meta("salt")
                 
-                # Verify that it's a valid Floaties DB by checking for the salt
                 if self.salt:
                     self.is_setup = False
                     self.inp_setup_pwd.clear()
                     
-                    # Dynamically switch the UI to the Login screen
                     self.stack.setCurrentWidget(self.view_login)
                     
                     QMessageBox.information(
@@ -249,13 +237,8 @@ class AuthFlowDialog(QDialog):
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(12) 
-        
-        # 1. Fixed top breathing room so the flat-topped logo never looks clipped
         l.addSpacing(20) 
-        
         l.addWidget(self._get_logo_header())
-        
-        # 2. The Shock Absorber: Pushes the logo up, and the fields down
         l.addStretch() 
         
         desc = QLabel("Unlock your vault")
@@ -292,14 +275,11 @@ class AuthFlowDialog(QDialog):
         self.btn_forgot.setStyleSheet("background: transparent; color: #06B6D4; font-size: 12px; font-weight: normal;")
         self.btn_forgot.clicked.connect(self._nav_to_recovery) 
         
-        # Stack the bottom elements
         l.addWidget(desc)
         l.addWidget(self.inp_login_pwd)
         l.addWidget(self.lbl_login_err)
         l.addWidget(self.btn_login)
         l.addWidget(self.btn_forgot)
-        
-        # 3. Fixed bottom margin so the buttons don't touch the window edge
         l.addSpacing(10) 
         return w
 
@@ -320,16 +300,14 @@ class AuthFlowDialog(QDialog):
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("font-size: 12px; color: #E0E0E0;")
         
-        # --- THE ILLUSION: A container that acts as the "Input Box" ---
         key_container = QFrame()
         key_container.setStyleSheet("QFrame { background: #2A2A2C; border: 1px solid #3A3A3C; border-radius: 6px; }")
         kc_layout = QHBoxLayout(key_container)
-        kc_layout.setContentsMargins(10, 4, 4, 4) # Tight right margin to hug the button
+        kc_layout.setContentsMargins(10, 4, 4, 4)
         kc_layout.setSpacing(8)
         
         self.lbl_reveal_key = QLineEdit()
         self.lbl_reveal_key.setReadOnly(True)
-        # The actual input is transparent and borderless
         self.lbl_reveal_key.setStyleSheet("background: transparent; color: #F1C40F; font-size: 15px; font-weight: bold; border: none;")
         
         self.btn_copy = QPushButton("COPY")
@@ -351,7 +329,6 @@ class AuthFlowDialog(QDialog):
         
         kc_layout.addWidget(self.lbl_reveal_key)
         kc_layout.addWidget(self.btn_copy)
-        # --------------------------------------------------------------
         
         self.btn_reveal_ack = QPushButton("I've saved this safely")
         self.btn_reveal_ack.setAutoDefault(False)
@@ -362,7 +339,7 @@ class AuthFlowDialog(QDialog):
         l.addSpacing(5)
         l.addWidget(desc)
         l.addStretch()
-        l.addWidget(key_container) # Add the container instead of just the line edit
+        l.addWidget(key_container)
         l.addSpacing(4)
         l.addWidget(self.btn_reveal_ack)
         return w
@@ -372,13 +349,8 @@ class AuthFlowDialog(QDialog):
         l = QVBoxLayout(w)
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(12) 
-        
-        # 1. Identical top margin
         l.addSpacing(20) 
-        
         l.addWidget(self._get_logo_header())
-        
-        # 2. Identical Shock Absorber
         l.addStretch() 
         
         subtitle = QLabel("Account Recovery")
@@ -408,13 +380,11 @@ class AuthFlowDialog(QDialog):
         btn_row.addWidget(btn_cancel)
         btn_row.addWidget(self.btn_recover)
         
-        # Stack the bottom elements
         l.addWidget(subtitle)
         l.addWidget(self.inp_rec_key)
         l.addWidget(self.lbl_rec_err)
         l.addLayout(btn_row)
         
-        # 3. Identical bottom margin
         l.addSpacing(10) 
         return w
 
@@ -431,18 +401,17 @@ class AuthFlowDialog(QDialog):
         if len(pwd) < 4:
             return 
             
-        self.setFocus() # ACTION: Safely shift focus away from input
+        self.setFocus()
         self.btn_setup.setEnabled(False)
         self.inp_setup_pwd.setEnabled(False)
         self.inp_setup_conf_pwd.setEnabled(False)
         self.btn_setup.setText("Preparing...")
         
-        # ACTION: Removed processEvents() to stop VS Code debugger panics.
-        # QTimer naturally yields to the event loop, so the UI will update on its own!
+        # Removed processEvents() to stop VS Code debugger panics.
+        # QTimer naturally yields to the event loop, so the UI will update on its own
         QTimer.singleShot(50, self._execute_setup_crypto)
 
     def _execute_setup_crypto(self) -> None:
-        # Read the password directly from the locked UI field
         pwd = self.inp_setup_pwd.text().strip()
         
         self.salt = Vault.generate_salt()
@@ -460,19 +429,16 @@ class AuthFlowDialog(QDialog):
         pwd = self.inp_login_pwd.text().strip()
         if not pwd: return
         
-        self.setFocus() # ACTION: Safely shift focus away from input
+        self.setFocus()
         self.btn_login.setEnabled(False)
         self.inp_login_pwd.setEnabled(False)
         self.btn_forgot.setEnabled(False) 
         
         self.lbl_login_err.setStyleSheet("color: #F1C40F;")
         self.lbl_login_err.setText("Loading...")
-        
-        # ACTION: Removed processEvents() to stop VS Code debugger panics.
         QTimer.singleShot(100, self._execute_login_crypto)
 
     def _execute_login_crypto(self) -> None:
-        # Read the password directly from the locked UI field
         pwd = self.inp_login_pwd.text().strip()
         
         token = self.db.get_meta("val_token")
@@ -510,12 +476,10 @@ class AuthFlowDialog(QDialog):
         rec_key = self.inp_rec_key.text().strip().upper()
         if not rec_key: return
         
-        self.setFocus() # ACTION: Safely shift focus away from input
+        self.setFocus()
         self.btn_recover.setEnabled(False)
         self.lbl_rec_err.setStyleSheet("color: #F1C40F;")
         self.lbl_rec_err.setText("Verifying...")
-        
-        # ACTION: Removed processEvents() to stop VS Code debugger panics.
         
         rec_salt = self.db.get_meta("recovery_salt")
         enc_pwd = self.db.get_meta("rec_enc_pwd")
@@ -546,12 +510,10 @@ class AuthFlowDialog(QDialog):
         self.inp_rec_key.setFocus()
     
     def _copy_recovery_key(self) -> None:
-        # Access the OS clipboard and inject the key
         clipboard = QApplication.clipboard()
         if clipboard:
             clipboard.setText(self.lbl_reveal_key.text())
-            
-            # Visual feedback: Flash the brand yellow
+
             self.btn_copy.setText("COPIED!")
             self.btn_copy.setStyleSheet("""
                 QPushButton { 
@@ -564,12 +526,11 @@ class AuthFlowDialog(QDialog):
                     padding: 6px 12px; 
                 }
             """)
-            # Reset back to normal after 2 seconds
+
             QTimer.singleShot(2000, self._reset_copy_btn)
 
     def _reset_copy_btn(self) -> None:
         try:
-            # Check if the C++ object still exists before modifying it
             self.btn_copy.setText("COPY")
             self.btn_copy.setStyleSheet("""
                 QPushButton { 
@@ -584,5 +545,5 @@ class AuthFlowDialog(QDialog):
                 QPushButton:hover { background: #4A4A4C; color: #FFFFFF; }
             """)
         except RuntimeError:
-            # The window was closed before the 2 seconds finished. Safely ignore!
+
             pass

@@ -12,6 +12,7 @@ floatslate.db
 *.db
 *.sqlite3
 .env
+*.bak
 
 # === PyInstaller Build Folders ===
 build/
@@ -22,3 +23,7 @@ dist/
 # === IDEs / OS ===
 .vscode/
 .DS_Store
+
+# Build Files
+*.snap
+snap/.snapcraft/

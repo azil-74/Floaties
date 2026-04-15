@@ -5,41 +5,34 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt6.QtGui import QColor, QMoveEvent, QResizeEvent
 
-# Import our modular ecosystem
 from ui.toolbar import FormattingToolbar, PRESET_THEMES, get_wcag_text_color
 from ui.header import DragHeader
 from ui.spawner import ACTIVE_NOTES 
 from ui.editor import SmartEditor 
 from ui.highlighter import MarkdownHighlighter 
 
-# Persistence & Security
 from database import DatabaseManager
 from security import Vault
 from ui.lockscreen import AuthFlowDialog
 from ui.dashboard import Dashboard
 
-# Upgraded sys.excepthook to intercept crashes, print them, and log them cleanly to floatslate.db
 import traceback
 
 def global_exception_hook(exctype, value, tb):
     """Catches PyQt6 crashes, prints to terminal, and logs to the local database."""
     
-    # --- The Ghost Shield ---
-    # If the IDE or terminal throws a fake Ctrl+C, ignore it entirely!
     if exctype is KeyboardInterrupt:
         print("\n⚡ [Shield] Neutralized a ghost IDE KeyboardInterrupt. App continues running.\n")
         return
 
-    # 1. Format the error into a readable string
+   
     traceback_str = "".join(traceback.format_exception(exctype, value, tb))
     
-    # 2. Print to terminal for live debugging
     print("\n" + "="*50)
     print("🚨 CRITICAL APPLICATION CRASH 🚨")
     print(traceback_str)
     print("="*50 + "\n")
     
-    # 3. Save to the database
     try:
         from database import DatabaseManager
         # Spin up an independent DB connection just for the crash report
@@ -48,7 +41,6 @@ def global_exception_hook(exctype, value, tb):
     except Exception as e:
         print(f"Telemetry Failure: Could not save crash to DB. {e}")
         
-    # 4. Abort the program safely
     sys.exit(1)
 
 sys.excepthook = global_exception_hook
@@ -82,12 +74,10 @@ class SaveWorker(QThread):
     def run(self) -> None:
         try:
             from security import Vault
-            # Heavy CPU Math Phase
             encrypted_content = Vault.encrypt(self.note_data["plain_text"], self.pwd, self.salt)
             self.note_data["content"] = encrypted_content
-            del self.note_data["plain_text"] # Clean up memory
+            del self.note_data["plain_text"]
             
-            # Disk I/O Phase
             db_id = self.db.upsert_note(self.note_data)
             self.finished_save.emit(db_id)
         except Exception as e:
@@ -95,12 +85,12 @@ class SaveWorker(QThread):
 
 class StickyNote(QMainWindow):
     """Core Sticky Note Window with Debounced DB Sync."""
-    # NEW: Real-time sync hook
+    
     note_saved = pyqtSignal()
-    # Action: Changed 'dict = None' to 'dict | None = None'
+
     def __init__(self, db: DatabaseManager, pwd: str, salt: bytes, theme_index: int = 6, note_data: dict | None = None) -> None:
         super().__init__()
-        # Vault & Persistence Context
+        
         self.db = db
         self.pwd = pwd
         self.salt = salt
@@ -116,7 +106,6 @@ class StickyNote(QMainWindow):
             
         self._init_ui()
         
-        # --- Lifecycle Sync State Restoration ---
         self.save_timer = QTimer(self)
         self.save_timer.setSingleShot(True)
         self.save_timer.timeout.connect(self._sync_to_db)
@@ -133,7 +122,7 @@ class StickyNote(QMainWindow):
                 self.text_editor.setPlainText("Decrypting payload... (Please wait)")
                 self.text_editor.setEnabled(False)
                 
-                # AUDIT FIX: Bound timer prevents segfaults if window is closed instantly
+                # Bound timer prevents segfaults if window is closed instantly
                 self.decrypt_timer = QTimer(self)
                 self.decrypt_timer.setSingleShot(True)
                 self.decrypt_timer.timeout.connect(self._execute_decryption)
@@ -146,7 +135,7 @@ class StickyNote(QMainWindow):
         self.text_editor.textChanged.connect(self._trigger_save)
         self.header.title_changed.connect(self._trigger_save)
         self.save_worker = None
-        self.pending_save = False # Queue flag for high-speed typing
+        self.pending_save = False
         
 
     def _init_ui(self) -> None:
@@ -204,32 +193,30 @@ class StickyNote(QMainWindow):
         finally:
             self.text_editor.setEnabled(True)
             self.text_editor.setFocus()
-            # Explicitly delete the cached encrypted byte array
+            
             if hasattr(self, '_cached_encrypted_content'):
                 del self._cached_encrypted_content
 
-    # --- Database I/O Hooks ---
+    
     def _trigger_save(self) -> None:
         """Debounces continuous events to prevent SQL/I-O lockups."""
         if hasattr(self, 'save_timer'):
             self.save_timer.start(1000)
 
-    # ... inside StickyNote.__init__ (add to the bottom of the method) ...
+    
         self.save_worker = None
-        self.pending_save = False # Queue flag for high-speed typing
+        self.pending_save = False
         
-    # ... replace existing _sync_to_db with this threaded version ...
+    
     def _sync_to_db(self) -> None:
         """Packages GUI state and dispatches it to the background cryptography thread."""
         if not hasattr(self, 'db') or not self.db:
             return
 
-        # Concurrency Lock: If thread is busy, queue the save for later.
         if self.save_worker is not None and self.save_worker.isRunning():
             self.pending_save = True
             return
 
-        # 1. Extract all state on the Main GUI Thread (CRITICAL for Wayland/Windows stability)
         raw_data = {
             "id": self.db_id,
             "title": self.header.title_label.text(),
@@ -242,22 +229,20 @@ class StickyNote(QMainWindow):
             "is_rolled_up": int(self.is_rolled_up)
         }
 
-        # 2. Dispatch to Background Core
+        
         self.save_worker = SaveWorker(self.db, self.pwd, self.salt, raw_data)
         self.save_worker.finished_save.connect(self._on_save_finished)
-        # AUDIT FIX: Force C++ to safely delete the thread object from RAM when finished
+        
         self.save_worker.finished.connect(self.save_worker.deleteLater)
         self.save_worker.start()
 
     def _on_save_finished(self, new_db_id: int) -> None:
         """Callback executed strictly on the Main Thread when crypto finishes."""
         self.db_id = new_db_id
-        self.note_saved.emit() # Ping dashboard live UI update
+        self.note_saved.emit() 
         
-        # AUDIT FIX: Sever the Python reference so it never queries a dead C++ object
         self.save_worker = None 
         
-        # If the user typed more while the thread was busy, instantly run the queued save
         if getattr(self, 'pending_save', False):
             self.pending_save = False
             self._sync_to_db()
@@ -295,7 +280,6 @@ class StickyNote(QMainWindow):
     def closeEvent(self, event) -> None:
         ACTIVE_NOTES.discard(self)
         
-        # Cache the real title before we visually alter it!
         real_title = self.header.title_label.text()
         
         if (self.save_worker is not None and self.save_worker.isRunning()) or \
@@ -305,7 +289,7 @@ class StickyNote(QMainWindow):
             from PyQt6.QtWidgets import QApplication
             QApplication.processEvents()
         
-        # Pass the real title to the save function so it doesn't save "Securing..."
+        
         self.force_sync_save_for_shutdown(real_title)
             
         super().closeEvent(event)
@@ -327,16 +311,14 @@ class StickyNote(QMainWindow):
     def force_sync_save_for_shutdown(self, actual_title: str | None = None) -> None:
         """Synchronous fallback exclusively for app shutdown."""
         
-        # AUDIT FIX: Bypass save entirely if Dashboard triggered a deletion
         if getattr(self, '_is_being_deleted', False):
             return
 
         if self.save_worker is not None and self.save_worker.isRunning():
-            # AUDIT FIX: Disconnect signals before waiting to prevent post-mortem ghost execution
             try:
                 self.save_worker.finished_save.disconnect()
             except TypeError:
-                pass # Failsafe if already disconnected
+                pass
             self.save_worker.wait() 
 
         if (hasattr(self, 'save_timer') and self.save_timer.isActive()) or getattr(self, 'pending_save', False):
@@ -363,23 +345,17 @@ class StickyNote(QMainWindow):
             self.db.upsert_note(data)
 
 def main() -> None:
-    # --- Windows Taskbar Icon Fix ---
-    # Forces Windows to group this as a unique app instead of "python.exe"
     if sys.platform == "win32":
         import ctypes
         myappid = 'floaties.app.core.1' 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-    # -------------------------------------
 
-    # Ensure the app doesn't quit if you close all floating notes
     QApplication.setQuitOnLastWindowClosed(False)
     app = QApplication(sys.argv)
     
-    # --- NEW: Set Global Application Icon ---
     from PyQt6.QtGui import QIcon
     from pathlib import Path
     
-    # Dynamically resolve the absolute path to the icon
     icon_path = Path(__file__).parent / "assets" / "Floaties.png"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
@@ -389,13 +365,11 @@ def main() -> None:
     
     db = DatabaseManager()
 
-    # --- First-Time Onboarding Walkthrough ---
-    # Only triggers if the vault has never been set up
     if db.get_meta("salt") is None:
         from ui.onboarding import OnboardingDialog
         intro = OnboardingDialog()
         if intro.exec() != QDialog.DialogCode.Accepted:
-            sys.exit(0) # User exited the intro
+            sys.exit(0)
             
     lock = AuthFlowDialog(db)
     if lock.exec() != QDialog.DialogCode.Accepted:
@@ -420,7 +394,7 @@ def run_background_maintenance():
     """Independent thread for DB optimization and log purging."""
     import time
     from database import DatabaseManager
-    # Wait for the system to settle before running cleanup
+
     time.sleep(5) 
     try:
         db = DatabaseManager()

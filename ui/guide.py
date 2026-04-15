@@ -1,7 +1,3 @@
-# Save Notes: Independent Guide/Info Window
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Updated text layout to match Footer-Menu migration and Drag/Drop features. Fixed button typography.
-
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PyQt6.QtCore import Qt, QSize
 from ui.utils import load_colored_svg
@@ -12,7 +8,6 @@ class GuideCloseButton(QPushButton):
         super().__init__()
         self.setFixedSize(28, 24)
         
-        # Action: Injecting the SVG directly into the button
         self.setIcon(load_colored_svg("close.svg", "#FFFFFF"))
         self.setIconSize(QSize(10, 10))
         
@@ -43,7 +38,6 @@ class InfoDialog(QDialog):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
         
-        # ACTION: Updated branding to Floaties
         title = QLabel("Floaties Power-User Guide")
         title.setStyleSheet("color: #FFFFFF; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif;")
         
@@ -56,7 +50,6 @@ class InfoDialog(QDialog):
 
         content = QLabel()
         
-        # --- ELITE TRICK: Dynamic In-Memory SVG to HTML Base64 ---
         def get_svg_html(filename: str, color: str, size: int = 14) -> str:
             from pathlib import Path
             import base64
@@ -67,11 +60,10 @@ class InfoDialog(QDialog):
             b64 = base64.b64encode(svg_data.encode('utf-8')).decode('utf-8')
             return f"<img src='data:image/svg+xml;base64,{b64}' width='{size}' height='{size}' style='vertical-align: middle;'>"
 
-        # Pre-render the HTML image tags for the guide
         img_plus = get_svg_html("plus.svg", "#569CD6", 14)
         img_edit = get_svg_html("edit.svg", "#569CD6", 14)
         img_min = get_svg_html("minimize.svg", "#569CD6", 14)
-        # Bumping the render size slightly to ensure visual clarity
+        
         img_close = get_svg_html("close.svg", "#569CD6", 15)
 
         icon_css = "font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; font-size: 15px; font-weight: bold; color: #569CD6; vertical-align: middle;"

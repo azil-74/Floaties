@@ -1,7 +1,3 @@
-# Save Notes: Custom Text Editor with Drag & Drop, URLs, and Native Overlays
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Hidden native OS scrollbars to maximize text real estate and maintain minimalist aesthetic.
-
 from PyQt6.QtWidgets import QTextEdit
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import (
@@ -16,7 +12,6 @@ class SmartEditor(QTextEdit):
         self.setAcceptDrops(True)
         self.setMouseTracking(True) 
         
-        # UI Polish: Eradicate chunky scrollbars. Native scrolling mechanics still work perfectly.
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
@@ -34,12 +29,10 @@ class SmartEditor(QTextEdit):
         """Breaks the native C++ synthetic event loop by isolating cursor control."""
         viewport = self.viewport()
         
-        # STRICT TYPING FIX: Ensure the viewport exists before modifying it
         if viewport is None:
             super().mouseMoveEvent(event)
             return
 
-        # 1. If holding Ctrl and hovering over a link, HIJACK the cursor.
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
             if self._get_url_at_pos(event.pos()):
                 viewport.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -47,7 +40,6 @@ class SmartEditor(QTextEdit):
                 event.accept()
                 return
 
-        # 2. If not over a link, relinquish control entirely back to the native engine.
         viewport.unsetCursor()
         super().mouseMoveEvent(event)
 
@@ -86,7 +78,7 @@ class SmartEditor(QTextEdit):
 
     def insertFromMimeData(self, source) -> None:
         """Force plain-text pasting to strip background colors from VS Code/Browsers."""
-        # STRICT TYPING FIX: Ensure source is not None before checking hasText()
+        
         if source is not None and source.hasText():
             self.insertPlainText(source.text())
         else:

@@ -1,0 +1,40 @@
+# Snap Build Blueprint
+# Target: Ubuntu 24.04 LTS
+# Action: Strict confinement Wayland-compatible build with embedded dependencies.
+
+name: floaties
+base: core24
+version: '1.0.0'
+summary: A secure and minimalist sticky note application.
+description: |
+  Floaties provides secure, encrypted, floating sticky notes for your desktop.
+  Features built-in atomic database storage, easy migration across Linux and Windows PCs, and a minimalist UI.
+
+grade: stable
+confinement: strict
+
+apps:
+  floaties:
+    command: bin/python3 $SNAP/main.py
+    extensions: [gnome]
+    desktop: snap/gui/floaties.desktop
+    environment:
+      QT_QPA_PLATFORM: wayland;xcb
+      # Ensures Wayland GNOME rendering uses the correct scale
+      QT_AUTO_SCREEN_SCALE_FACTOR: '1' 
+    plugs:
+      - home
+      - opengl
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+
+parts:
+  floaties-app:
+    plugin: python
+    source: .
+    python-requirements:
+      - requirements.txt
+    stage-packages:
+      - libsqlite3-0

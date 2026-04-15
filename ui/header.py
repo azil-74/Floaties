@@ -1,7 +1,3 @@
-# Save Notes: Drag Header with Explicit Edit State Toggle
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Replaced implicit drag-through math with explicit UI state toggling for flawless OS-level dragging.
-
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QMainWindow, QLineEdit, QLabel, QPushButton
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal
 from PyQt6.QtGui import QMouseEvent
@@ -13,14 +9,13 @@ from ui.utils import load_colored_svg
 class EditButton(QPushButton):
     def __init__(self):
         super().__init__()
-        # 1. Change these numbers to resize the button's clickable area
+        
         self.setFixedSize(22, 22) 
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def set_theme(self, text_hex: str) -> None:
         self.setIcon(load_colored_svg("edit.svg", text_hex))
         
-        # 2. This controls the actual scale of the SVG inside the button.
         from PyQt6.QtCore import QSize
         self.setIconSize(QSize(12, 12)) 
         
@@ -53,8 +48,6 @@ class DragHeader(QFrame):
         self.btn_new = SpawnButton(self._parent_window)
         self.window_controls = WindowControls(self._parent_window)
 
-        # --- Explicit State UI ---
-        # 1. The Display State (Transparent to clicks)
         self.title_label = QLabel("Untitled")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -62,14 +55,12 @@ class DragHeader(QFrame):
         self.btn_edit = EditButton()
         self.btn_edit.clicked.connect(self._enable_editing)
 
-        # 2. The Edit State (Hidden by default)
         self.title_editor = QLineEdit()
         self.title_editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_editor.setMaxLength(64)
         self.title_editor.setVisible(False)
         self.title_editor.editingFinished.connect(self._on_title_edited)
 
-        # Layout Assembly: Using stretch factors to perfectly center the title while leaving the sides empty for dragging
         layout.addWidget(self.btn_new)
         layout.addStretch() 
         layout.addWidget(self.title_label)
@@ -97,13 +88,13 @@ class DragHeader(QFrame):
         self.title_editor.setText(self.title_label.text())
         self.title_editor.setVisible(True)
         self.title_editor.setFocus()
-        self.title_editor.selectAll() # UX Polish: Instantly select all text for rapid renaming
+        self.title_editor.selectAll()
 
     def _on_title_edited(self) -> None:
         """Saves the title and swaps the UI back to Display Mode."""
         raw_text = self.title_editor.text().strip()
         if not raw_text:
-            raw_text = "Untitled Note" # Fallback safeguard
+            raw_text = "Untitled Note"
             
         self.title_label.setText(raw_text)
         self.title_changed.emit(raw_text)
@@ -112,7 +103,6 @@ class DragHeader(QFrame):
         self.title_label.setVisible(True)
         self.btn_edit.setVisible(True)
 
-    # --- Native Dragging Logic (Now 100% stable) ---
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_pos = event.globalPosition().toPoint()

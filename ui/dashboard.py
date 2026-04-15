@@ -1,6 +1,3 @@
-# Floaties Dashboard 
-# Action: Applied universal Golden Yellow / Dark theme for brand consistency.
-
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLineEdit, 
     QLabel, QPushButton, QListWidget, QListWidgetItem, QStackedWidget,
@@ -106,7 +103,7 @@ class NoteItemWidget(QWidget):
         from PyQt6.QtGui import QIcon
         
         if checked:
-            # Inject the dark brand color to pop against the yellow background
+            
             self.checkbox.setIcon(load_colored_svg("check.svg", "#1A1A1A"))
             self.checkbox.setIconSize(QSize(14, 14))
         else:
@@ -398,17 +395,15 @@ class Dashboard(QMainWindow):
         self.search_bar = QLineEdit()
         self.search_bar.setPlaceholderText("Search your vault...")
         
-        # 1. Shift the typing area to the right so it doesn't overlap our new icon position
         self.search_bar.setTextMargins(42, 0, 0, 0) 
         
         from ui.utils import load_colored_svg
         search_icon = load_colored_svg("search.svg", "#888888")
         
         if not search_icon.isNull():
-            # 2. Use an internal layout for pixel-perfect icon placement
+            
             icon_layout = QHBoxLayout(self.search_bar)
             
-            # 19px left margin perfectly aligns the icon with the checkboxes below
             icon_layout.setContentsMargins(19, 0, 0, 0) 
             
             search_label = QLabel()
@@ -417,31 +412,29 @@ class Dashboard(QMainWindow):
             search_label.setStyleSheet("border: none; background: transparent;")
             
             icon_layout.addWidget(search_label)
-            icon_layout.addStretch() # Pushes the icon to stay on the left
+            icon_layout.addStretch()
             
         self.search_bar.textChanged.connect(self._filter_notes)
         
         self.list_notes = QListWidget()
-        # ACTION: Removed the lambda to attach a robust error-catching method
+        
         self.list_notes.itemDoubleClicked.connect(self._handle_note_open)
         
         btn_row = QHBoxLayout()
         
-        # ACTION: Proper Native SVG Implementation
         btn_spawn_new = QPushButton()
         btn_spawn_new.setObjectName("ActionBtn")
         btn_spawn_new.setFixedWidth(36) 
         btn_spawn_new.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        # Inject the custom #1A1A1A dark color to contrast the yellow background
         from ui.utils import load_colored_svg
         icon = load_colored_svg("plus.svg", "#1A1A1A")
         
         if not icon.isNull():
             btn_spawn_new.setIcon(icon)
-            btn_spawn_new.setIconSize(QSize(16, 16)) # Scaled slightly to match the 12x12 minimalist aesthetic
+            btn_spawn_new.setIconSize(QSize(16, 16))
         else:
-            btn_spawn_new.setText("+") # Failsafe
+            btn_spawn_new.setText("+")
             
         btn_spawn_new.setStyleSheet("""
             QPushButton { 
@@ -519,7 +512,6 @@ class Dashboard(QMainWindow):
         
         self.btn_toggle_security.clicked.connect(self._toggle_security_accordion)
 
-        # --- Export Vault Section ---
         export_container = QWidget()
         export_layout = QVBoxLayout(export_container)
         export_layout.setContentsMargins(16, 16, 16, 0)
@@ -542,7 +534,6 @@ class Dashboard(QMainWindow):
         """)
         btn_export.clicked.connect(self._export_vault)
 
-        # --- NEW: Crash Logs Button ---
         btn_export_logs = QPushButton("Export Crash Logs")
         btn_export_logs.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_export_logs.setStyleSheet("""
@@ -551,7 +542,6 @@ class Dashboard(QMainWindow):
         """)
         btn_export_logs.clicked.connect(self._export_crash_logs)
 
-        # Place them side-by-side
         btn_row = QHBoxLayout()
         btn_row.addWidget(btn_export)
         btn_row.addWidget(btn_export_logs)
@@ -562,7 +552,7 @@ class Dashboard(QMainWindow):
 
         l.addWidget(self.btn_toggle_security)
         l.addWidget(self.sec_container)
-        l.addWidget(export_container) # Add the new container to the main layout
+        l.addWidget(export_container)
         l.addStretch()
         return w
     
@@ -571,7 +561,6 @@ class Dashboard(QMainWindow):
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
         from datetime import datetime
 
-        # Suggest a filename with today's date
         date_str = datetime.now().strftime("%Y-%m-%d")
         suggested_name = f"Floaties_Backup_{date_str}.vault"
 
@@ -581,8 +570,7 @@ class Dashboard(QMainWindow):
         
         if file_path:
             try:
-                # ACTION: Removed the encapsulation-breaking db.conn call.
-                # Relying entirely on DatabaseManager's atomic writes.
+               
                 shutil.copy2(self.db.db_path, file_path)
                 
                 QMessageBox.information(
@@ -623,13 +611,10 @@ class Dashboard(QMainWindow):
         l.setAlignment(Qt.AlignmentFlag.AlignTop)
         l.setContentsMargins(16, 24, 16, 16)
         
-        # 1. Branding Header
-        # Action: Used rich HTML to specifically target the v1.0 sizing and color
         title = QLabel("Floaties <span style='font-size: 14px; color: #888888; font-weight: normal;'>v1.0</span>")
         title.setStyleSheet("font-size: 24px; font-weight: bold; color: #FFF;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # 2. Main Description
         desc = QLabel(
             "Floaties is a minimalist, local-first sticky note application designed "
             "for Linux and Windows. It was built to provide a clean, native experience "
@@ -639,7 +624,6 @@ class Dashboard(QMainWindow):
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("font-size: 13px; color: #A0A0A0; line-height: 1.5;")
         
-        # 3. THE SECURITY PROMISE
         security_pitch = QLabel(
             "<i>While most apps store your notes in plain text for anyone to see, Floaties treats your "
             "thoughts like physical valuables in a private safe. I used professional-grade encryption "
@@ -656,10 +640,9 @@ class Dashboard(QMainWindow):
             padding: 10px;
         """)
         
-        # 4. Support Button
         btn_donate = QPushButton("☕ Support the Developer")
         btn_donate.setCursor(Qt.CursorShape.PointingHandCursor)
-        # Action: Applied an analogous Blue-to-Cyan gradient for better color harmony
+        
         btn_donate.setStyleSheet("""
             QPushButton { 
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563EB, stop:1 #06B6D4); 
@@ -676,11 +659,10 @@ class Dashboard(QMainWindow):
         """)
         btn_donate.clicked.connect(self._open_support_link)
         
-        # Action: Temporarily hidden for v1.0 release while gateways are researched.
-        # Simply delete this line to re-enable the button in a future update.
+        # Temporarily hidden for v1.0 release while gateways are researched.
+
         btn_donate.hide()
 
-        # 5. Email & Bug Reports
         feedback_title = QLabel("Found a bug or have a suggestion?")
         feedback_title.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: bold; margin-top: 16px;")
         feedback_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -693,7 +675,6 @@ class Dashboard(QMainWindow):
         feedback_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         feedback_desc.setStyleSheet("font-size: 12px; color: #A0A0A0; margin-bottom: 8px;")
 
-        # Container matching the Recovery Key aesthetic
         email_container = QFrame()
         email_container.setStyleSheet("QFrame { background: #2A2A2C; border: 1px solid #3A3A3C; border-radius: 6px; }")
         ec_layout = QHBoxLayout(email_container)
@@ -702,7 +683,7 @@ class Dashboard(QMainWindow):
 
         self.lbl_email = QLineEdit("azil@tute.io")
         self.lbl_email.setReadOnly(True)
-        # Action: Unified color with the Support Button's cyan gradient stop (#06B6D4)
+        
         self.lbl_email.setStyleSheet("background: transparent; color: #06B6D4; font-size: 13px; font-weight: bold; border: none;")
 
         self.btn_copy_email = QPushButton("COPY")
@@ -737,15 +718,15 @@ class Dashboard(QMainWindow):
         from PyQt6.QtGui import QDesktopServices
         from PyQt6.QtCore import QUrl
         try:
-            # Safely hand off the URL to the operating system
-            url = QUrl("https://ko-fi.com/therealazil")
+
+            url = QUrl("https://website.com")
             success = QDesktopServices.openUrl(url)
             
             if not success:
                 print("OS refused to open the URL. (Check default browser settings)")
         except Exception as e:
-            # If Wayland/Windows fails to find a browser, we catch it gracefully instead of crashing
-            print(f"🚨 Browser routing failed: {e}")
+            
+            print(f"Browser routing failed: {e}")
 
     def _copy_support_email(self) -> None:
         """Copies the support email to clipboard and flashes the button cyan."""
@@ -776,8 +757,6 @@ class Dashboard(QMainWindow):
             """)
         except RuntimeError:
             pass
-
-    # --- Interaction Logic ---
 
     def _update_action_buttons_visibility(self) -> None:
         has_checked = len(self._get_marked_notes()) > 0
@@ -855,7 +834,6 @@ class Dashboard(QMainWindow):
     def _spawn_empty_note(self) -> None:
         self._launch_note_instance(None)
     
-    # ERROR CATCHER TEMPORARY
     def _handle_note_open(self, item) -> None:
         """Robust wrapper to catch silent PyQt6 slot exceptions."""
         try:
@@ -867,9 +845,6 @@ class Dashboard(QMainWindow):
             print("🚨 REAL CRASH TRACEBACK REVEALED 🚨")
             traceback.print_exc()
             print("="*40 + "\n")
-    # Save Notes: Dashboard Note Spawner Patch
-# Target: ui/dashboard.py -> Dashboard class
-# Action: Resolved SQLite NULL ID crash. Implemented decoupled O(1) theme cycling via event signals.
 
     def _launch_note_instance(self, note_data: dict | None) -> None:
         from main import StickyNote
@@ -877,7 +852,7 @@ class Dashboard(QMainWindow):
         from ui.toolbar import PRESET_THEMES, get_wcag_text_color
         
         if note_data:
-            # Focus existing note if already active
+            
             for active_note in ACTIVE_NOTES:
                 if active_note.db_id == note_data["id"]:
                     active_note.raise_()
@@ -885,24 +860,21 @@ class Dashboard(QMainWindow):
                     return
             note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=note_data)
         else:
-            # 1. Clean Instantiation: Pass None to allow StickyNote to generate a valid DB ID securely
+            
             note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=None)
             
-            # 2. O(1) Decoupled Theme Cycling
             if PRESET_THEMES:
                 theme_count = len(PRESET_THEMES)
-                # Action: Offset the cycle by 6 to ensure the first note is Charcoal/Black
+                
                 selected_theme = PRESET_THEMES[(len(ACTIVE_NOTES) + 6) % theme_count]
                 
                 bg_hex = selected_theme["bg"]
                 border_hex = selected_theme["border"]
                 text_hex = get_wcag_text_color(bg_hex)
                 
-                # Robustness: Emit through the existing event bus to prevent tight coupling and state mutation
                 if hasattr(note, 'toolbar'):
                     note.toolbar.theme_color_changed.emit(bg_hex, border_hex, text_hex)
             
-            # 3. Apply mathematical cascading for UI placement
             if ACTIVE_NOTES:
                 last_note = list(ACTIVE_NOTES)[-1]
                 note.move(last_note.x() + 30, last_note.y() + 30)
@@ -1001,7 +973,6 @@ class Dashboard(QMainWindow):
             self.inp_conf_pwd.clear()
             self.lbl_sec_status.setText("")
             
-            # ACTION: Replaced native OS MessageBox with our custom branded dialog
             success_dialog = PasswordUpdatedDialog(new_rec_key, self)
             success_dialog.exec()
             
@@ -1018,22 +989,20 @@ class Dashboard(QMainWindow):
         
         total_active = len(ACTIVE_NOTES)
 
-        # ACTION: Intercept the close request if notes are open
         if total_active > 0:
             dialog = ExitConfirmDialog(total_active, self)
             dialog.exec()
 
             if dialog.choice == "cancel":
-                event.ignore() # Stop the window from closing
+                event.ignore()
                 return
             elif dialog.choice == "minimize":
-                event.ignore() # Stop the window from closing
-                self.showMinimized() # Push it to the taskbar instead
+                event.ignore()
+                self.showMinimized()
                 return
             elif dialog.choice == "exit":
-                pass # Proceed downward to the save-and-close loop
+                pass
 
-        # --- The Standard Save & Close Loop ---
         notes_to_save = [
             n for n in ACTIVE_NOTES 
             if (hasattr(n, 'save_timer') and n.save_timer.isActive()) 

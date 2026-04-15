@@ -1,12 +1,28 @@
-# Save Notes: The Persistence Engine 
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Injected safe ALTER TABLE migration for created_at timestamps.
-
 import sqlite3
 import logging
 from pathlib import Path
 from typing import Generator, Any, List, Dict, Optional
 from contextlib import contextmanager
+import os
+
+
+def _resolve_secure_db_path() -> Path:
+    """
+    Architectural fix: Resolves a safe, writable path for the database.
+    Prioritizes containerized environments, then falls back to OS standards.
+    """
+    snap_data = os.environ.get("SNAP_USER_DATA")
+    if snap_data:
+        storage_dir = Path(snap_data)
+    
+    elif os.name == "nt": 
+        storage_dir = Path(os.environ.get("APPDATA", "")) / "Floaties"
+    
+    else:
+        storage_dir = Path.home() / ".local" / "share" / "Floaties"
+        
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    return storage_dir / "floatslate.db"
 
 DB_PATH = Path(__file__).parent / "floatslate.db"
 
@@ -64,9 +80,9 @@ class DatabaseManager:
             try:
                 cur.execute("ALTER TABLE notes ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP")
             except sqlite3.OperationalError:
-                pass # Column already exists, proceed normally
+                pass
                 
-            # --- Crash Telemetry Table ---
+            
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS crash_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,15 +104,15 @@ class DatabaseManager:
         """Purges crash logs older than the specified number of days."""
         import sqlite3
         try:
-            # 1. Perform the deletion within a safe transaction
+            
             with self.transaction() as cur:
                 cur.execute(
                     "DELETE FROM crash_logs WHERE timestamp < datetime('now', ?)", 
                     (f'-{days} days',)
                 )
             
-            # 2. VACUUM must happen OUTSIDE of an active transaction block
-            # We open a temporary raw connection just for this optimization
+            # VACUUM must happen OUTSIDE of an active transaction block
+            
             conn = sqlite3.connect(self.db_path)
             conn.execute("VACUUM;")
             conn.close()

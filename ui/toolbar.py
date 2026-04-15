@@ -1,14 +1,9 @@
-# Save Notes: Static Footer Toolbar with WCAG Auto-Contrast
-# Target: Windows (Dev) -> Ubuntu (Prod)
-# Action: Integrated the Guide/Menu button from the header.
-
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QFrame, QMenu, QGridLayout
 )
 from PyQt6.QtGui import QTextCharFormat, QFont, QColor, QPainter, QBrush, QTextListFormat
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 
-# Import the standalone guide window
 from ui.guide import InfoDialog
 
 PRESET_THEMES = [
@@ -93,7 +88,6 @@ class FormattingToolbar(QFrame):
         btn_list = QPushButton("L")
         btn_list.clicked.connect(self._toggle_list)
 
-        # Meta Actions (Right Side)
         self.btn_guide = QPushButton("≡")
         self.btn_guide.setStyleSheet("font-size: 16px; font-weight: normal; font-family: 'Segoe UI', sans-serif;")
         self.btn_guide.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -155,7 +149,6 @@ class FormattingToolbar(QFrame):
         self.info_window = InfoDialog()
         self.info_window.show()
 
-    # --- Robust Text Formatting Logic ---
     def _toggle_bold(self) -> None:
         fmt = self.editor.currentCharFormat()
         weight = QFont.Weight.Bold if fmt.fontWeight() != QFont.Weight.Bold else QFont.Weight.Normal
