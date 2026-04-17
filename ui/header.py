@@ -70,7 +70,14 @@ class DragHeader(QFrame):
         layout.addWidget(self.window_controls)
 
     def set_theme(self, bg_hex: str, border_hex: str, text_hex: str) -> None:
-        self.setStyleSheet(f"#DragHeader {{ background-color: {bg_hex}; border-bottom: 1px solid {border_hex}; }}")
+        self.setStyleSheet(f"""
+            #DragHeader {{ 
+                background-color: {bg_hex}; 
+                border-bottom: 1px solid {border_hex}; 
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+            }}
+        """)
         
         common_font = f"color: {text_hex}; font-family: 'Segoe UI', 'Helvetica Neue', sans-serif; font-weight: bold; font-size: 12px;"
         self.title_label.setStyleSheet(common_font)

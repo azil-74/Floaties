@@ -20,13 +20,15 @@ class AuthFlowDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(380, 420)
         
         from pathlib import Path
         self.icon_path = str(Path(__file__).parent.parent / "assets" / "Floaties.png")
         
         self.setStyleSheet("""
-            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QDialog { background: transparent; }
+            QFrame#BaseFrame { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
             QLabel { font-family: 'Segoe UI', system-ui; color: #E0E0E0; }
             QLineEdit { background: #2A2A2C; color: #FFF; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-size: 13px;}
             QLineEdit:focus { border: 1px solid #F1C40F; }
@@ -35,7 +37,15 @@ class AuthFlowDialog(QDialog):
             QPushButton:disabled { background: #3A3A3C; color: #888; }
         """)
         
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame(self)
+        self.base_frame.setObjectName("BaseFrame")
+        outer_layout.addWidget(self.base_frame)
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        
+        layout = QVBoxLayout(self.base_frame)
         layout.setContentsMargins(25, 25, 25, 25)
         self.stack = QStackedWidget()
         layout.addWidget(self.stack)
@@ -52,7 +62,6 @@ class AuthFlowDialog(QDialog):
         
         self.stack.setCurrentWidget(self.view_setup if self.is_setup else self.view_login)
 
-    # --- View Navigation Helpers (Fixes Lambda crash) ---
     def _nav_to_recovery(self):
         self.stack.setCurrentWidget(self.view_recovery)
         
@@ -129,7 +138,7 @@ class AuthFlowDialog(QDialog):
         self.inp_setup_pwd.textChanged.connect(self._validate_setup_passwords)
         self.inp_setup_conf_pwd.textChanged.connect(self._validate_setup_passwords)
 
-        self.btn_setup = QPushButton("Encrypt & Start")
+        self.btn_setup = QPushButton("Encrypt && Start")
         self.btn_setup.setAutoDefault(False) 
         self.btn_setup.setEnabled(False)
         self.btn_setup.clicked.connect(self._process_setup)

@@ -66,7 +66,12 @@ class FormattingToolbar(QFrame):
 
     def set_theme(self, bg_hex: str, border_hex: str, text_hex: str) -> None:
         self.setStyleSheet(f"""
-            #FooterToolbar {{ background-color: {bg_hex}; border-top: 1px solid {border_hex}; }}
+            #FooterToolbar {{ 
+                background-color: {bg_hex}; 
+                border-top: 1px solid {border_hex}; 
+                border-bottom-left-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }}
             QPushButton {{ border: none; padding: 4px; border-radius: 4px; font-weight: bold; background-color: transparent; color: {text_hex}; }}
             QPushButton:hover {{ background-color: rgba(0,0,0,0.1); }}
         """) 

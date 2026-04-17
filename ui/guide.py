@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
 from PyQt6.QtCore import Qt, QSize
 from ui.utils import load_colored_svg
 
@@ -27,11 +27,25 @@ class InfoDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(360, 340) 
         
-        self.setStyleSheet("QDialog { background-color: #252526; border: 1px solid #3E3E42; }")
+        
+        self.setStyleSheet("""
+            QDialog { background: transparent; }
+            QFrame#BaseFrame { background-color: #252526; border: 1px solid #3E3E42; border-radius: 8px; }
+        """)
 
-        layout = QVBoxLayout(self)
+        
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame(self)
+        self.base_frame.setObjectName("BaseFrame")
+        outer_layout.addWidget(self.base_frame)
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+
+        layout = QVBoxLayout(self.base_frame)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(12)
 

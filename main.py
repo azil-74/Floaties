@@ -143,11 +143,15 @@ class StickyNote(QMainWindow):
             Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.WindowStaysOnTopHint
         )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setMinimumSize(150, 150)
         self.resize(200, 300) 
 
+        self.setStyleSheet("QMainWindow { background: transparent; }")
+
         self.container = QFrame(self)
         self.container.setObjectName("NoteContainer")
+        self.container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setCentralWidget(self.container)
 
         theme = PRESET_THEMES[self._current_theme_index % len(PRESET_THEMES)]
@@ -156,7 +160,7 @@ class StickyNote(QMainWindow):
         base_text = get_wcag_text_color(base_bg)
         accent_bg = QColor(base_bg).darker(115).name()
 
-        self.container.setStyleSheet(f"#NoteContainer {{ background-color: {base_bg}; border: 1px solid {base_border}; }}")
+        self.container.setStyleSheet(f"#NoteContainer {{ background-color: {base_bg}; border: 1px solid {base_border}; border-radius: 8px; }}")
 
         self.header = DragHeader(self)
         self.header.set_theme(accent_bg, base_border, base_text)
@@ -295,7 +299,7 @@ class StickyNote(QMainWindow):
         super().closeEvent(event)
 
     def _update_theme_color(self, bg_hex: str, border_hex: str, text_hex: str) -> None:
-        self.container.setStyleSheet(f"#NoteContainer {{ background-color: {bg_hex}; border: 1px solid {border_hex}; }}")
+        self.container.setStyleSheet(f"#NoteContainer {{ background-color: {bg_hex}; border: 1px solid {border_hex}; border-radius: 8px; }}")
         accent_bg = QColor(bg_hex).darker(115).name()
         
         self.header.set_theme(accent_bg, border_hex, text_hex)

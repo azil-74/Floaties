@@ -11,9 +11,12 @@ class OnboardingDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(420, 480)
+        
         self.setStyleSheet("""
-            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QDialog { background: transparent; }
+            QFrame#BaseFrame { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
             QLabel { font-family: 'Segoe UI', system-ui; color: #E0E0E0; }
             
             /* Action: Removed font-weight: bold for a sleeker aesthetic */
@@ -25,7 +28,16 @@ class OnboardingDialog(QDialog):
             QPushButton#BackButton:hover { background: #2A2A2C; color: #FFFFFF; }
         """)
         
-        layout = QVBoxLayout(self)
+        # Action: Create the Inner Frame Pattern
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame(self)
+        self.base_frame.setObjectName("BaseFrame")
+        outer_layout.addWidget(self.base_frame)
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        
+        layout = QVBoxLayout(self.base_frame)
         self.stack = QStackedWidget()
         self.stack.addWidget(self._slide_welcome())
         self.stack.addWidget(self._slide_security())

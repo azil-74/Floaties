@@ -120,13 +120,24 @@ class PasswordUpdatedDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(380, 260)
+        
         self.setStyleSheet("""
-            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QDialog { background: transparent; }
+            QFrame#BaseFrame { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
             QLabel { font-family: 'Segoe UI', system-ui; }
         """)
         
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame(self)
+        self.base_frame.setObjectName("BaseFrame")
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        outer_layout.addWidget(self.base_frame)
+        
+        layout = QVBoxLayout(self.base_frame)
         layout.setContentsMargins(25, 25, 25, 25)
 
         title = QLabel("Password Updated")
@@ -222,13 +233,24 @@ class ExitConfirmDialog(QDialog):
 
     def _init_ui(self) -> None:
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(380, 220)
+        
         self.setStyleSheet("""
-            QDialog { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
+            QDialog { background: transparent; }
+            QFrame#BaseFrame { background-color: #1E1E1E; border: 1px solid #333333; border-radius: 12px; }
             QLabel { font-family: 'Segoe UI', system-ui; }
         """)
 
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame(self)
+        self.base_frame.setObjectName("BaseFrame")
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        outer_layout.addWidget(self.base_frame)
+
+        layout = QVBoxLayout(self.base_frame)
         layout.setContentsMargins(25, 25, 25, 25)
 
         title = QLabel("Active Notes Detected")
@@ -291,6 +313,49 @@ class ExitConfirmDialog(QDialog):
         self.choice = "cancel"
         self.reject()
 
+class DashboardHeader(QFrame):
+    """Custom drag header to replace the native OS title bar."""
+    def __init__(self, parent_window):
+        super().__init__(parent_window)
+        self.parent_window = parent_window
+        self.setFixedHeight(40)
+        
+        self.setStyleSheet("""
+            background: transparent; 
+            border-bottom: 1px solid #333333;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 0, 16, 0)
+        
+        title = QLabel("Floaties Dashboard")
+        title.setStyleSheet("color: #888888; font-weight: bold; font-size: 13px; border: none;")
+        
+        btn_close = QPushButton("✕")
+        btn_close.setFixedSize(24, 24)
+        btn_close.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_close.setStyleSheet("""
+            QPushButton { background: transparent; color: #888888; border: none; font-weight: bold; font-size: 14px; padding: 0px; } 
+            QPushButton:hover { color: #FF453A; }
+        """)
+        btn_close.clicked.connect(self.parent_window.close)
+        
+        layout.addWidget(title)
+        layout.addStretch()
+        layout.addWidget(btn_close)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_pos = event.globalPosition().toPoint()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, '_drag_pos'):
+            delta = event.globalPosition().toPoint() - self._drag_pos
+            self.parent_window.move(self.parent_window.pos() + delta)
+            self._drag_pos = event.globalPosition().toPoint()
+
 class Dashboard(QMainWindow):
     def __init__(self, db: DatabaseManager, pwd: str, salt: bytes):
         super().__init__()
@@ -301,16 +366,19 @@ class Dashboard(QMainWindow):
         self.setWindowTitle("Floaties")
         self.setMinimumSize(420, 550)
         
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
         self.setStyleSheet("""
-            QMainWindow { background-color: #1A1A1A; }
+            QMainWindow { background: transparent; }
+            QFrame#DashBase { background-color: #1A1A1A; border: 1px solid #333333; border-radius: 12px; }
             QLabel { color: #E0E0E0; font-family: 'Segoe UI', system-ui; }
             QLineEdit { background: #2A2A2C; color: #FFF; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-size: 13px; }
-            QLineEdit:focus { border: 1px solid #F1C40F; } /* Yellow Focus */
+            QLineEdit:focus { border: 1px solid #F1C40F; }
             
             QPushButton { background: #2A2A2C; color: #E0E0E0; border: 1px solid #3A3A3C; padding: 8px 16px; border-radius: 6px; font-weight: 500; }
             QPushButton:hover { background: #353537; }
             
-            /* Action Buttons (Yellow with Dark Text) */
             QPushButton#ActionBtn { background: #F1C40F; color: #1A1A1A; border: none; font-weight: bold; }
             QPushButton#ActionBtn:hover { background: #D4AC0D; }
             
@@ -320,7 +388,7 @@ class Dashboard(QMainWindow):
             QListWidget { background: transparent; border: none; outline: none; }
             QListWidget::item { border-bottom: 1px solid #2A2A2C; border-radius: 6px; margin-bottom: 2px;}
             QListWidget::item:hover { background: #222222; }
-            QListWidget::item:selected { background: transparent; border: 1px solid #F1C40F; } /* Yellow Select Outline */
+            QListWidget::item:selected { background: transparent; border: 1px solid #F1C40F; }
         """)
         
         self._init_ui()
@@ -329,8 +397,26 @@ class Dashboard(QMainWindow):
     def _init_ui(self) -> None:
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(16, 16, 16, 16)
+        
+        outer_layout = QVBoxLayout(central_widget)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.base_frame = QFrame()
+        self.base_frame.setObjectName("DashBase")
+        self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        outer_layout.addWidget(self.base_frame)
+        
+        # Container layout includes 0 top margin to flush the header
+        frame_layout = QVBoxLayout(self.base_frame)
+        frame_layout.setContentsMargins(0, 0, 0, 16)
+        
+        self.header = DashboardHeader(self)
+        frame_layout.addWidget(self.header)
+        
+        # Wrap the rest of the original layout in a content layout
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(16, 8, 16, 0)
+        frame_layout.addLayout(main_layout)
         
         nav_container = QFrame()
         nav_container.setStyleSheet("QFrame { background: #2A2A2C; border-radius: 8px; padding: 2px; }")
@@ -373,9 +459,17 @@ class Dashboard(QMainWindow):
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setCheckable(True)
         btn.setChecked(is_active)
-        btn.setFixedHeight(30)
+        btn.setFixedHeight(34)
+        
         btn.setStyleSheet("""
-            QPushButton { background: transparent; border: none; color: #A0A0A0; font-weight: 600; border-radius: 6px; }
+            QPushButton { 
+                background: transparent; 
+                border: none; 
+                color: #A0A0A0; 
+                font-size: 13px; 
+                font-weight: normal; 
+                border-radius: 6px; 
+            }
             QPushButton:hover { color: #E0E0E0; }
             QPushButton:checked { background: #3A3A3C; color: #FFF; border: 1px solid #4A4A4C; }
         """)
@@ -469,41 +563,65 @@ class Dashboard(QMainWindow):
         return w
 
     def _build_settings_view(self) -> QWidget:
-        w = QWidget()
-        l = QVBoxLayout(w)
-        l.setAlignment(Qt.AlignmentFlag.AlignTop)
-        l.setContentsMargins(0, 8, 0, 0)
+        from PyQt6.QtWidgets import QScrollArea
         
-        self.btn_toggle_security = QPushButton("Security && Password  ↓")
-        self.btn_toggle_security.setStyleSheet("text-align: left; padding: 12px; background: #2A2A2C; border: none; font-size: 14px;")
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+
+        scroll.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical { width: 0px; background: transparent; }
+            QScrollBar:horizontal { height: 0px; background: transparent; }
+        """)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        
+        content_container = QWidget()
+        content_container.setObjectName("SettingsContent")
+        content_container.setStyleSheet("#SettingsContent { background: transparent; }")
+        l = QVBoxLayout(content_container)
+        l.setAlignment(Qt.AlignmentFlag.AlignTop)
+        l.setContentsMargins(0, 8, 0, 16)
+        l.setSpacing(16)
+        
+        self.btn_toggle_security = QPushButton("Security & Password  ↓")
+        self.btn_toggle_security.setStyleSheet("text-align: left; padding: 12px; background: #2A2A2C; border: none; font-size: 14px; font-weight: bold; border-radius: 6px;")
         self.btn_toggle_security.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.sec_container = QWidget()
         self.sec_container.setVisible(False) 
         sec_layout = QVBoxLayout(self.sec_container)
-        sec_layout.setContentsMargins(16, 8, 16, 16)
+        sec_layout.setContentsMargins(16, 0, 16, 0)
+        sec_layout.setSpacing(12)
+        
+        lbl_warning = QLabel("Warning: Rotating keys takes a moment. Do not close the app.")
+        lbl_warning.setStyleSheet("color: #F1C40F; font-size: 12px;")
+        lbl_warning.setWordWrap(True)
         
         self.inp_curr_pwd = QLineEdit()
         self.inp_curr_pwd.setPlaceholderText("Current Password")
         self.inp_curr_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self.inp_curr_pwd.setMinimumHeight(38)
         
         self.inp_new_pwd = QLineEdit()
         self.inp_new_pwd.setPlaceholderText("New Password")
         self.inp_new_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self.inp_new_pwd.setMinimumHeight(38)
         
         self.inp_conf_pwd = QLineEdit()
         self.inp_conf_pwd.setPlaceholderText("Confirm New Password")
         self.inp_conf_pwd.setEchoMode(QLineEdit.EchoMode.Password)
+        self.inp_conf_pwd.setMinimumHeight(38)
         
         self.lbl_sec_status = QLabel("")
         
         btn_change_pwd = QPushButton("Update Password")
         btn_change_pwd.setObjectName("ActionBtn")
         btn_change_pwd.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_change_pwd.setMinimumHeight(38)
         btn_change_pwd.clicked.connect(self._execute_key_rotation)
         
-        sec_layout.addWidget(QLabel("Warning: Rotating keys takes a moment. Do not close the app."))
-        sec_layout.addSpacing(8)
+        sec_layout.addWidget(lbl_warning)
         sec_layout.addWidget(self.inp_curr_pwd)
         sec_layout.addWidget(self.inp_new_pwd)
         sec_layout.addWidget(self.inp_conf_pwd)
@@ -514,7 +632,8 @@ class Dashboard(QMainWindow):
 
         export_container = QWidget()
         export_layout = QVBoxLayout(export_container)
-        export_layout.setContentsMargins(16, 16, 16, 0)
+        export_layout.setContentsMargins(16, 0, 16, 0)
+        export_layout.setSpacing(8)
 
         lbl_export = QLabel("Backup & Restore")
         lbl_export.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: 600;")
@@ -524,37 +643,68 @@ class Dashboard(QMainWindow):
             "You can restore this file on a new device using your current Master Password."
         )
         desc_export.setWordWrap(True)
-        desc_export.setStyleSheet("font-size: 12px; color: #888888; margin-bottom: 5px;")
+        desc_export.setStyleSheet("font-size: 12px; color: #888888; margin-bottom: 2px;")
 
         btn_export = QPushButton("Export Secure Vault")
         btn_export.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export.setMinimumHeight(38)
         btn_export.setStyleSheet("""
             QPushButton { background: #3A3A3C; color: #E0E0E0; border: none; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
             QPushButton:hover { background: #4A4A4C; color: #FFF; }
         """)
         btn_export.clicked.connect(self._export_vault)
 
+        export_layout.addWidget(lbl_export)
+        export_layout.addWidget(desc_export)
+        export_layout.addWidget(btn_export)
+
+        logs_container = QWidget()
+        logs_layout = QVBoxLayout(logs_container)
+        logs_layout.setContentsMargins(16, 0, 16, 0)
+        logs_layout.setSpacing(8)
+
+        lbl_logs = QLabel("Diagnostics")
+        lbl_logs.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: 600;")
+
+        desc_logs = QLabel(
+            "Export application crash logs to help identify and troubleshoot system or compatibility issues."
+        )
+        desc_logs.setWordWrap(True)
+        desc_logs.setStyleSheet("font-size: 12px; color: #888888; margin-bottom: 2px;")
+
         btn_export_logs = QPushButton("Export Crash Logs")
         btn_export_logs.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_export_logs.setMinimumHeight(38)
         btn_export_logs.setStyleSheet("""
             QPushButton { background: transparent; color: #F1C40F; border: 1px solid #F1C40F; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
             QPushButton:hover { background: rgba(241, 196, 15, 0.1); }
         """)
         btn_export_logs.clicked.connect(self._export_crash_logs)
 
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(btn_export)
-        btn_row.addWidget(btn_export_logs)
-
-        export_layout.addWidget(lbl_export)
-        export_layout.addWidget(desc_export)
-        export_layout.addLayout(btn_row)
+        logs_layout.addWidget(lbl_logs)
+        logs_layout.addWidget(desc_logs)
+        logs_layout.addWidget(btn_export_logs)
 
         l.addWidget(self.btn_toggle_security)
         l.addWidget(self.sec_container)
+        
+        line1 = QFrame()
+        line1.setFrameShape(QFrame.Shape.HLine)
+        line1.setStyleSheet("border-top: 1px solid #333333; margin: 8px 16px;")
+        l.addWidget(line1)
+        
         l.addWidget(export_container)
+        
+        line2 = QFrame()
+        line2.setFrameShape(QFrame.Shape.HLine)
+        line2.setStyleSheet("border-top: 1px solid #333333; margin: 8px 16px;")
+        l.addWidget(line2)
+        
+        l.addWidget(logs_container)
         l.addStretch()
-        return w
+        
+        scroll.setWidget(content_container)
+        return scroll
     
     def _export_vault(self) -> None:
         import shutil
