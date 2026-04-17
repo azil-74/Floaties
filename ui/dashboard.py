@@ -406,14 +406,12 @@ class Dashboard(QMainWindow):
         self.base_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         outer_layout.addWidget(self.base_frame)
         
-        # Container layout includes 0 top margin to flush the header
         frame_layout = QVBoxLayout(self.base_frame)
         frame_layout.setContentsMargins(0, 0, 0, 16)
         
         self.header = DashboardHeader(self)
         frame_layout.addWidget(self.header)
         
-        # Wrap the rest of the original layout in a content layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(16, 8, 16, 0)
         frame_layout.addLayout(main_layout)
@@ -654,9 +652,22 @@ class Dashboard(QMainWindow):
         """)
         btn_export.clicked.connect(self._export_vault)
 
+        btn_merge = QPushButton("Import && Merge Vault")
+        btn_merge.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_merge.setMinimumHeight(38)
+        btn_merge.setStyleSheet("""
+            QPushButton { background: transparent; color: #F1C40F; border: 1px solid #3A3A3C; padding: 10px; border-radius: 6px; font-weight: bold; font-size: 13px; }
+            QPushButton:hover { background: rgba(241, 196, 15, 0.1); border: 1px solid #F1C40F; }
+        """)
+        btn_merge.clicked.connect(self._merge_vault)
+
+        btn_row_vault = QHBoxLayout()
+        btn_row_vault.addWidget(btn_export)
+        btn_row_vault.addWidget(btn_merge)
+
         export_layout.addWidget(lbl_export)
         export_layout.addWidget(desc_export)
-        export_layout.addWidget(btn_export)
+        export_layout.addLayout(btn_row_vault)
 
         logs_container = QWidget()
         logs_layout = QVBoxLayout(logs_container)
@@ -707,9 +718,9 @@ class Dashboard(QMainWindow):
         return scroll
     
     def _export_vault(self) -> None:
-        import shutil
         from PyQt6.QtWidgets import QFileDialog, QMessageBox
         from datetime import datetime
+        import sqlite3
 
         date_str = datetime.now().strftime("%Y-%m-%d")
         suggested_name = f"Floaties_Backup_{date_str}.vault"
@@ -721,7 +732,11 @@ class Dashboard(QMainWindow):
         if file_path:
             try:
                
-                shutil.copy2(self.db.db_path, file_path)
+                source_conn = sqlite3.connect(self.db.db_path)
+                dest_conn = sqlite3.connect(file_path)
+                source_conn.backup(dest_conn)
+                dest_conn.close()
+                source_conn.close()
                 
                 QMessageBox.information(
                     self, "Export Successful", 
@@ -754,6 +769,52 @@ class Dashboard(QMainWindow):
                     self, "System Stable", 
                     "There are no crash logs to export. Your application is perfectly healthy!"
                 )
+    
+    def _merge_vault(self) -> None:
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        from merger import VaultMerger
+        import os
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Vault to Merge", "", "Floaties Vault (*.vault *.db);;All Files (*)",
+            options=QFileDialog.Option.DontUseNativeDialog
+        )
+        
+        if file_path:
+            try:
+                if os.path.samefile(file_path, str(self.db.db_path)):
+                    QMessageBox.warning(self, "Invalid Selection", "You cannot merge the currently active vault into itself.")
+                    return
+            except OSError:
+                pass 
+
+            success = VaultMerger.execute_merge(self, self.db, self.pwd, self.salt, file_path)
+            
+            if success:
+                self._refresh_notes_list()
+               
+                reply = QMessageBox.question(
+                    self, 
+                    "Display Imported Notes", 
+                    "Would you like to open and display the imported notes on your screen now?\n\n"
+                    "(Warning: Opening dozens of notes at once may consume significant system resources.)",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    from ui.spawner import ACTIVE_NOTES
+                    from main import StickyNote
+                    
+                    all_db_notes = self.db.load_all_notes()
+                    active_ids = {n.db_id for n in ACTIVE_NOTES if n.db_id is not None}
+                    
+                    for note_data in all_db_notes:
+
+                        if note_data["id"] not in active_ids and "(Imported)" in note_data["title"]:
+                            new_note = StickyNote(db=self.db, pwd=self.pwd, salt=self.salt, note_data=note_data)
+                            ACTIVE_NOTES.add(new_note)
+                            new_note.show()
 
     def _build_about_view(self) -> QWidget:
         w = QWidget()

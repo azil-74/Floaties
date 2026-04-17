@@ -91,7 +91,7 @@ class AuthFlowDialog(QDialog):
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(12)
         
-        l.addWidget(self._get_logo_header())
+        l.addSpacing(10)
         
         desc = QLabel("Create your Master Password.")
         desc.setStyleSheet("font-size: 15px; font-weight: bold; color: #FFFFFF;")
