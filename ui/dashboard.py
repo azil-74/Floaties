@@ -365,7 +365,7 @@ class Dashboard(QMainWindow):
         self.setWindowTitle("Floaties")
         self.setMinimumSize(420, 550)
         
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         self.setStyleSheet("""
@@ -1180,6 +1180,17 @@ class Dashboard(QMainWindow):
     def _set_sec_err(self, msg: str) -> None:
         self.lbl_sec_status.setStyleSheet("color: #FF453A;")
         self.lbl_sec_status.setText(msg)
+
+    def showEvent(self, event) -> None:
+        """Re-asserts always-on-top via EWMH after the window is fully mapped."""
+        super().showEvent(event)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self._assert_always_on_top)
+
+    def _assert_always_on_top(self) -> None:
+        """Dispatches the EWMH ClientMessage to force always-on-top under XWayland/GNOME."""
+        from ui.utils_x11 import force_always_on_top
+        force_always_on_top(self)
 
     def closeEvent(self, event) -> None:
         from ui.spawner import ACTIVE_NOTES

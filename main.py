@@ -250,6 +250,17 @@ class StickyNote(QMainWindow):
             self.pending_save = False
             self._sync_to_db()
 
+    def showEvent(self, event) -> None:
+        """Re-asserts always-on-top via EWMH after the window is fully mapped."""
+        super().showEvent(event)
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(50, self._assert_always_on_top)
+
+    def _assert_always_on_top(self) -> None:
+        """Dispatches the EWMH ClientMessage to force always-on-top under XWayland/GNOME."""
+        from ui.utils_x11 import force_always_on_top
+        force_always_on_top(self)
+
     def moveEvent(self, event: QMoveEvent) -> None:
         super().moveEvent(event)
         self._trigger_save()

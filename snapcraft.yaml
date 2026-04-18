@@ -64,6 +64,7 @@ parts:
     python-packages:
       - PyQt6
       - cryptography
+      - python-xlib
     stage-packages:
       - libxcb-cursor0
       - libfontconfig1
