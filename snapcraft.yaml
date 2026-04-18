@@ -1,45 +1,45 @@
 name: floaties
 title: Floaties
 license: MIT
-contact: azil@tuta.io
 base: core24
 version: '1.0.0'
-issues: https://github.com/azil-74/floaties/issues
-source-code: https://github.com/azil-74/floaties
 summary: A secure and minimalist sticky note application.
 description: |
   Floaties provides secure, encrypted, floating sticky notes for your desktop.
   Features built-in atomic database storage, easy migration across Linux and Windows PCs, and a minimalist UI.
 
+contact: mailto:azil@tuta.io
+website: https://github.com/azil-74/floaties
+issues: https://github.com/azil-74/floaties/issues
+source-code: https://github.com/azil-74/floaties
+donation: https://therealazil.gumroad.com/l/vdsqh
+
 grade: stable
 confinement: strict
 
+platforms:
+  amd64:
+
+parts:
+  floaties:
+    plugin: python
+    source: .
+    python-packages:
+      - PyQt6
+      - cryptography
+    stage-packages:
+      - libxcb-cursor0
+      - libfontconfig1
+      - libx11-6
+  
 apps:
   floaties:
     command: bin/python3 $SNAP/main.py
     extensions: [gnome]
-    environment:
-      QT_QPA_PLATFORM: wayland;xcb
-      QT_AUTO_SCREEN_SCALE_FACTOR: '1' 
     plugs:
       - home
-      - opengl
+      - network
       - desktop
       - desktop-legacy
-      - wayland
       - x11
-
-parts:
-
-  dependencies:
-    plugin: python
-    source: .
-    python-requirements:
-      - requirements.txt
-    stage-packages:
-      - libsqlite3-0
-      - libxcb-cursor0
-
-  source-code:
-    plugin: dump
-    source: .
+      - wayland
