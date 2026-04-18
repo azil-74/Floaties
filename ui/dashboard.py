@@ -344,14 +344,16 @@ class DashboardHeader(QFrame):
         layout.addWidget(btn_close)
 
     def mousePressEvent(self, event):
+        """Enable dragging via Native System Compositor (Wayland/X11 Safe)"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint()
+            window_handle = self.parent_window.windowHandle()
+            if window_handle:
+                window_handle.startSystemMove()
+            event.accept()
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton and hasattr(self, '_drag_pos'):
-            delta = event.globalPosition().toPoint() - self._drag_pos
-            self.parent_window.move(self.parent_window.pos() + delta)
-            self._drag_pos = event.globalPosition().toPoint()
+        """Delegated to startSystemMove()"""
+        pass
 
 class Dashboard(QMainWindow):
     def __init__(self, db: DatabaseManager, pwd: str, salt: bytes):

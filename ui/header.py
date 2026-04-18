@@ -110,13 +110,14 @@ class DragHeader(QFrame):
         self.title_label.setVisible(True)
         self.btn_edit.setVisible(True)
 
-    def mousePressEvent(self, event: QMouseEvent) -> None:
+    def mousePressEvent(self, event):
+        """Enable dragging via Native System Compositor (Wayland/X11 Safe)"""
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_pos = event.globalPosition().toPoint()
-            self.setFocus()
+            window_handle = self._parent_window.windowHandle()
+            if window_handle:
+                window_handle.startSystemMove()
+            event.accept()
 
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            delta = event.globalPosition().toPoint() - self._drag_pos
-            self._parent_window.move(self._parent_window.pos() + delta)
-            self._drag_pos = event.globalPosition().toPoint()
+    def mouseMoveEvent(self, event):
+        """Delegated to startSystemMove()"""
+        pass
