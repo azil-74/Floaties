@@ -2,6 +2,8 @@
 venv/
 env/
 
+.github/
+
 # === Python Cache ===
 __pycache__/
 *.py[cod]
