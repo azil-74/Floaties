@@ -31,11 +31,19 @@ parts:
       - libxcb-cursor0
       - libfontconfig1
       - libx11-6
-  
+      
+  metadata:
+    plugin: dump
+    source: gui/
+    organize:
+      floaties.png: meta/gui/floaties.png
+      floaties.desktop: meta/gui/floaties.desktop
+
 apps:
   floaties:
     command: bin/python3 $SNAP/main.py
     extensions: [gnome]
+    desktop: gui/floaties.desktop
     plugs:
       - home
       - network
@@ -43,3 +51,4 @@ apps:
       - desktop-legacy
       - x11
       - wayland
+  
