@@ -4,6 +4,8 @@ license: MIT
 contact: azil@tuta.io
 base: core24
 version: '1.0.0'
+issues: https://github.com/azil-74/floaties/issues
+source-code: https://github.com/azil-74/floaties
 summary: A secure and minimalist sticky note application.
 description: |
   Floaties provides secure, encrypted, floating sticky notes for your desktop.
