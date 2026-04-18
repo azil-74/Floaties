@@ -31,10 +31,10 @@ parts:
       - libxcb-cursor0
       - libfontconfig1
       - libx11-6
-      
+
   metadata:
     plugin: dump
-    source: gui/
+    source: .
     organize:
       floaties.png: meta/gui/floaties.png
       floaties.desktop: meta/gui/floaties.desktop
