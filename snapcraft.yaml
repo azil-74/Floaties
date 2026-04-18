@@ -2,11 +2,32 @@ name: floaties
 title: Floaties
 license: MIT
 base: core24
-version: '1.0.0'
+version: '1.0.1'
 summary: A secure and minimalist sticky note application.
 description: |
-  Floaties provides secure, encrypted, floating sticky notes for your desktop.
-  Features built-in atomic database storage, easy migration across Linux and Windows PCs, and a minimalist UI.
+  Secure, minimalist, and encrypted floating sticky notes for your desktop.
+
+  Floaties is a distraction-free note-taking application designed for users who prioritize privacy and a clean workspace. Built with a local-first philosophy, it ensures your data remains under your absolute control at all times.
+
+  WHY CHOOSE FLOATIES?
+
+  * Uncompromising Privacy: Every note is secured using professional-grade AES-256 encryption. Your local vault is protected by Argon2id, a memory-hard key derivation function.
+  * Zero Cloud Policy: Your data never leaves your machine. There are no accounts to create, no tracking scripts, and no "phoning home" to remote servers.
+  * Minimalist UI: Modern, frameless windows built to provide a sleek experience that floats over your workflow without cluttering your screen.
+  * Smart Persistence: The application automatically remembers your window positions, sizes, and states, so your workspace is exactly how you left it.
+  * Atomic Storage: Powered by a thread-safe SQLite engine to ensure your data is saved reliably and instantly.
+
+  INDEPENDENT SOFTWARE
+
+  Floaties is a solo-developed project built by a hobbyist for the community. It is free to use, ad-free, and respects your digital sovereignty.
+
+  If you find Floaties useful for your workflow, consider supporting the project via the donation link in the sidebar. Your support directly fuels further development, bug fixes, and new features.
+
+  COMPATIBILITY AND PORTABILITY
+
+  * Linux Optimized: This Snap is fine-tuned for Ubuntu and other distributions using Wayland or X11.
+  * Cross-Platform Sync: Backups and vault files are fully compatible between Linux and Windows. You can seamlessly import and export your data across different operating systems.
+  * Windows Version: Available via the source repository (and coming soon to the Microsoft Store).
 
 contact: mailto:azil@tuta.io
 website: https://github.com/azil-74/floaties
