@@ -30,6 +30,47 @@ class EditButton(QPushButton):
             }}
         """)
 
+class PinButton(QPushButton):
+    """A minimalist toggle button for the Pin state using SVGs."""
+    def __init__(self, parent_window):
+        super().__init__()
+        self._parent_window = parent_window
+        self.setFixedSize(22, 22)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setCheckable(True)
+        self.setToolTip("Pin to Desktop")
+        self.clicked.connect(self._on_toggled)
+        self._text_hex = "#E0E0E0"
+        
+        from PyQt6.QtCore import QSize
+        self.setIconSize(QSize(12, 12)) 
+        
+        self.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background: transparent;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 0, 0, 0.08);
+                border-radius: 4px;
+            }
+        """)
+
+    def _on_toggled(self, checked: bool) -> None:
+        if hasattr(self._parent_window, "is_pinned"):
+            self._parent_window.is_pinned = checked
+        self._apply_icon()
+
+    def set_theme(self, text_hex: str) -> None:
+        self._text_hex = text_hex
+        self._apply_icon()
+
+    def _apply_icon(self) -> None:
+        """Swaps between the hollow and solid pin SVGs."""
+        if self.isChecked():
+            self.setIcon(load_colored_svg("pin_solid.svg", self._text_hex))
+        else:
+            self.setIcon(load_colored_svg("pin_outline.svg", self._text_hex))
 
 class DragHeader(QFrame):
     title_changed = pyqtSignal(str)
@@ -54,6 +95,8 @@ class DragHeader(QFrame):
 
         self.btn_edit = EditButton()
         self.btn_edit.clicked.connect(self._enable_editing)
+        
+        self.btn_pin = PinButton(self._parent_window)
 
         self.title_editor = QLineEdit()
         self.title_editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -67,6 +110,7 @@ class DragHeader(QFrame):
         layout.addWidget(self.title_editor)
         layout.addWidget(self.btn_edit)
         layout.addStretch() 
+        layout.addWidget(self.btn_pin)
         layout.addWidget(self.window_controls)
 
     def set_theme(self, bg_hex: str, border_hex: str, text_hex: str) -> None:
@@ -85,6 +129,7 @@ class DragHeader(QFrame):
         
         self.btn_new.set_theme(text_hex)
         self.btn_edit.set_theme(text_hex)
+        self.btn_pin.set_theme(text_hex)
         self.window_controls.set_theme(text_hex)
 
     def _enable_editing(self) -> None:
@@ -113,6 +158,10 @@ class DragHeader(QFrame):
     def mousePressEvent(self, event):
         """Enable dragging via Native System Compositor (Wayland/X11 Safe)"""
         if event.button() == Qt.MouseButton.LeftButton:
+           
+            if getattr(self._parent_window, "is_pinned", False):
+                return 
+
             window_handle = self._parent_window.windowHandle()
             if window_handle:
                 window_handle.startSystemMove()

@@ -28,7 +28,7 @@ class InfoDialog(QDialog):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(360, 340) 
+        self.setFixedSize(360, 360) 
         
         
         self.setStyleSheet("""
@@ -52,7 +52,7 @@ class InfoDialog(QDialog):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
         
-        title = QLabel("Floaties Power-User Guide")
+        title = QLabel("Floaties Guide")
         title.setStyleSheet("color: #FFFFFF; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', sans-serif;")
         
         self.btn_close = GuideCloseButton()
@@ -75,6 +75,7 @@ class InfoDialog(QDialog):
             return f"<img src='data:image/svg+xml;base64,{b64}' width='{size}' height='{size}' style='vertical-align: middle;'>"
 
         img_plus = get_svg_html("plus.svg", "#569CD6", 14)
+        img_pin = get_svg_html("pin_outline.svg", "#569CD6", 14)
         img_edit = get_svg_html("edit.svg", "#569CD6", 14)
         img_min = get_svg_html("minimize.svg", "#569CD6", 14)
         
@@ -85,6 +86,7 @@ class InfoDialog(QDialog):
         content.setText(
             f"<b style='color:#4EC9B0;'>Header Controls:</b><br>"
             f"&nbsp;&nbsp;{img_plus} : Spawn a new note<br>"
+            f"&nbsp;&nbsp;{img_pin} : Toggle Pin to top (Lock Position)<br>"
             f"&nbsp;&nbsp;{img_edit} : Edit note title<br>"
             f"&nbsp;&nbsp;{img_min} : Left-Click Roll-up, Right-Click Minimize<br>"
             f"&nbsp;&nbsp;{img_close} : Close note<br><br>"

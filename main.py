@@ -1,4 +1,8 @@
+import os
 import sys
+
+os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QGridLayout, QFrame, QSizeGrip, QDialog
 )
@@ -96,6 +100,7 @@ class StickyNote(QMainWindow):
         self.db_id = note_data.get("id") if note_data else None
         
         self.is_rolled_up = False
+        self.is_pinned = False
         self._normal_height = 150 
         
         if note_data:
@@ -250,17 +255,6 @@ class StickyNote(QMainWindow):
             self.pending_save = False
             self._sync_to_db()
 
-    def showEvent(self, event) -> None:
-        """Re-asserts always-on-top via EWMH after the window is fully mapped."""
-        super().showEvent(event)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(50, self._assert_always_on_top)
-
-    def _assert_always_on_top(self) -> None:
-        """Dispatches the EWMH ClientMessage to force always-on-top under XWayland/GNOME."""
-        from ui.utils_x11 import force_always_on_top
-        force_always_on_top(self)
-
     def moveEvent(self, event: QMoveEvent) -> None:
         super().moveEvent(event)
         self._trigger_save()
@@ -292,6 +286,8 @@ class StickyNote(QMainWindow):
         self._trigger_save()
 
     def closeEvent(self, event) -> None:
+        if hasattr(self, '_raise_timer'):
+            self._raise_timer.stop()
         ACTIVE_NOTES.discard(self)
         
         real_title = self.header.title_label.text()

@@ -116,8 +116,13 @@ class PasswordUpdatedDialog(QDialog):
         self._init_ui()
 
     def _init_ui(self) -> None:
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.Dialog | 
+            Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setWindowTitle("Floaties Security")
         self.setFixedSize(380, 260)
         
         self.setStyleSheet("""
@@ -229,8 +234,13 @@ class ExitConfirmDialog(QDialog):
         self._init_ui()
 
     def _init_ui(self) -> None:
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.Dialog | 
+            Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setWindowTitle("Exit Floaties")
         self.setFixedSize(380, 220)
         
         self.setStyleSheet("""
@@ -365,7 +375,7 @@ class Dashboard(QMainWindow):
         self.setWindowTitle("Floaties")
         self.setMinimumSize(420, 550)
         
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         self.setStyleSheet("""
@@ -1182,17 +1192,22 @@ class Dashboard(QMainWindow):
         self.lbl_sec_status.setText(msg)
 
     def showEvent(self, event) -> None:
-        """Re-asserts always-on-top via EWMH after the window is fully mapped."""
+        """Starts the re-raise polling timer when the dashboard becomes visible."""
         super().showEvent(event)
-        from PyQt6.QtCore import QTimer
-        QTimer.singleShot(50, self._assert_always_on_top)
+        if not hasattr(self, '_raise_timer'):
+            self._raise_timer = QTimer(self)
+            self._raise_timer.setInterval(300)
+            self._raise_timer.timeout.connect(self._keep_on_top)
+        self._raise_timer.start()
 
-    def _assert_always_on_top(self) -> None:
-        """Dispatches the EWMH ClientMessage to force always-on-top under XWayland/GNOME."""
-        from ui.utils_x11 import force_always_on_top
-        force_always_on_top(self)
+    def _keep_on_top(self) -> None:
+        """Raises the dashboard in Z-order without stealing keyboard focus."""
+        if self.isVisible() and not self.isMinimized():
+            self.raise_()
 
     def closeEvent(self, event) -> None:
+        if hasattr(self, '_raise_timer'):
+            self._raise_timer.stop()
         from ui.spawner import ACTIVE_NOTES
         from PyQt6.QtWidgets import QApplication
         

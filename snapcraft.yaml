@@ -2,7 +2,7 @@ name: floaties
 title: Floaties
 license: MIT
 base: core24
-version: '1.0.2'
+version: '1.0.3'
 summary: A secure and minimalist sticky note application.
 description: |
   Secure, minimalist, and encrypted floating sticky notes for your desktop.
@@ -64,7 +64,6 @@ parts:
     python-packages:
       - PyQt6
       - cryptography
-      - python-xlib
     stage-packages:
       - libxcb-cursor0
       - libfontconfig1
