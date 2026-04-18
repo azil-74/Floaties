@@ -20,8 +20,24 @@ confinement: strict
 platforms:
   amd64:
 
-parts:
+apps:
   floaties:
+    command: bin/python3 $SNAP/main.py
+    extensions: [gnome]
+    environment:
+      QT_QPA_PLATFORM: wayland;xcb
+      QT_AUTO_SCREEN_SCALE_FACTOR: '1'
+    plugs:
+      - home
+      - network
+      - opengl
+      - desktop
+      - desktop-legacy
+      - x11
+      - wayland
+
+parts:
+  python-env:
     plugin: python
     source: .
     python-packages:
@@ -31,25 +47,10 @@ parts:
       - libxcb-cursor0
       - libfontconfig1
       - libx11-6
+      - libsqlite3-0
+      - libxkbcommon-x11-0
+      - libegl1
 
-  metadata:
+  app-code:
     plugin: dump
     source: .
-    organize:
-      floaties.png: meta/gui/floaties.png
-      floaties.desktop: meta/gui/floaties.desktop
-
-apps:
-  floaties:
-    command: bin/python3 $SNAP/main.py
-    extensions: [gnome]
-    desktop: gui/floaties.desktop
-    environment:
-      QT_QPA_PLATFORM: xcb
-    plugs:
-      - home
-      - network
-      - desktop
-      - desktop-legacy
-      - x11
-  
