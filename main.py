@@ -35,7 +35,6 @@ def global_exception_hook(exctype, value, tb):
     
     try:
         from database import DatabaseManager
-        # Spin up an independent DB connection just for the crash report
         crash_db = DatabaseManager() 
         crash_db.log_crash(traceback_str)
     except Exception as e:
@@ -69,7 +68,7 @@ class SaveWorker(QThread):
         self.db = db
         self.pwd = pwd
         self.salt = salt
-        self.note_data = note_data # Contains raw text, NOT GUI objects
+        self.note_data = note_data
 
     def run(self) -> None:
         try:
@@ -121,8 +120,7 @@ class StickyNote(QMainWindow):
                 self._cached_encrypted_content = note_data["content"]
                 self.text_editor.setPlainText("Decrypting payload... (Please wait)")
                 self.text_editor.setEnabled(False)
-                
-                # Bound timer prevents segfaults if window is closed instantly
+        
                 self.decrypt_timer = QTimer(self)
                 self.decrypt_timer.setSingleShot(True)
                 self.decrypt_timer.timeout.connect(self._execute_decryption)
@@ -130,8 +128,7 @@ class StickyNote(QMainWindow):
             
             if note_data["is_rolled_up"]:
                 self.toggle_rollup()
-                
-        # --- Attach Triggers (Post-Init to prevent boot-flooding) ---
+
         self.text_editor.textChanged.connect(self._trigger_save)
         self.header.title_changed.connect(self._trigger_save)
         self.save_worker = None

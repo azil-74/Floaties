@@ -63,24 +63,21 @@ class NoteItemWidget(QWidget):
         text_col.addWidget(self.title_label)
         text_col.addWidget(self.date_label)
         
+        from ui.utils import load_colored_svg
         self.btn_delete = QPushButton()
-        self.btn_delete.setFixedSize(24, 24) 
+        self.btn_delete.setFixedSize(28, 28)
         self.btn_delete.setCursor(Qt.CursorShape.PointingHandCursor)
         
-        app_style = QApplication.style()
-        if app_style is not None:
-            close_icon = app_style.standardIcon(QStyle.StandardPixmap.SP_TitleBarCloseButton)
-            self.btn_delete.setIcon(close_icon)
-            self.btn_delete.setIconSize(QSize(10, 10)) 
-        else:
-            self.btn_delete.setText("✕")
+        
+        trash_icon = load_colored_svg("trash.svg", "#888888")
+        self.btn_delete.setIcon(trash_icon)
+        self.btn_delete.setIconSize(QSize(14, 14)) 
         
         self.btn_delete.setStyleSheet("""
             QPushButton { 
                 background: #2A2A2C; 
                 border: 1px solid #3A3A3C; 
                 border-radius: 6px; 
-                color: #666666;
             }
             QPushButton:hover { 
                 background: #FF453A; 
@@ -868,11 +865,8 @@ class Dashboard(QMainWindow):
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #1D4ED8, stop:1 #0891B2); 
             }
         """)
-        btn_donate.clicked.connect(self._open_support_link)
-        
-        # Temporarily hidden for v1.0 release while gateways are researched.
-
-        btn_donate.hide()
+       
+        btn_donate.clicked.connect(self._open_support_dialog)
 
         feedback_title = QLabel("Found a bug or have a suggestion?")
         feedback_title.setStyleSheet("color: #E0E0E0; font-size: 14px; font-weight: bold; margin-top: 16px;")
@@ -924,20 +918,11 @@ class Dashboard(QMainWindow):
         l.addStretch()
         return w
     
-    def _open_support_link(self) -> None:
-        """Safely asks the native OS to open the default web browser."""
-        from PyQt6.QtGui import QDesktopServices
-        from PyQt6.QtCore import QUrl
-        try:
-
-            url = QUrl("https://website.com")
-            success = QDesktopServices.openUrl(url)
-            
-            if not success:
-                print("OS refused to open the URL. (Check default browser settings)")
-        except Exception as e:
-            
-            print(f"Browser routing failed: {e}")
+    def _open_support_dialog(self) -> None:
+        """Imports and opens the external Support Dialog module."""
+        from ui.support import SupportDialog
+        dialog = SupportDialog(self)
+        dialog.exec()
 
     def _copy_support_email(self) -> None:
         """Copies the support email to clipboard and flashes the button cyan."""
