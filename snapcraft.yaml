@@ -44,11 +44,12 @@ apps:
     command: bin/python3 $SNAP/main.py
     extensions: [gnome]
     desktop: gui/floaties.desktop
+    environment:
+      QT_QPA_PLATFORM: xcb
     plugs:
       - home
       - network
       - desktop
       - desktop-legacy
       - x11
-      - wayland
   

@@ -95,7 +95,8 @@ class SupportDialog(QDialog):
         main_layout.addLayout(content_layout)
         
     def _open_link(self, url_string: str) -> None:
-        QDesktopServices.openUrl(QUrl(url_string))
+        import webbrowser
+        webbrowser.open(url_string) 
         self.accept()
     
     def _show_qr(self) -> None:
